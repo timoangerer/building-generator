@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural Building Generator</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="panel brand">
+          <p class="eyebrow">Procedural Architecture Lab</p>
+          <h1>Facade-first 3D building generator</h1>
+          <p class="intro">
+            Generate plot footprints, extrude them, then control each facade with a
+            JSON layout language that behaves like a building-aware flex/grid system.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Building</h2>
+          <label>
+            Plot shape
+            <select id="plotType"></select>
+          </label>
+          <label>
+            Floors
+            <input id="floors" type="range" min="2" max="12" step="1" value="5" />
+            <span id="floorsValue">5</span>
+          </label>
+          <label>
+            Floor height
+            <input id="floorHeight" type="range" min="2.8" max="5.2" step="0.1" value="3.4" />
+            <span id="floorHeightValue">3.4m</span>
+          </label>
+          <label>
+            Seed
+            <input id="seed" type="number" min="1" max="999999" step="1" value="1337" />
+          </label>
+          <div class="actions">
+            <button id="randomizeShape">Random plot</button>
+            <button id="randomizeAll">Randomize all</button>
+            <button id="regenerate" class="primary">Generate</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Facade DSL</h2>
+          <label>
+            Edit side
+            <select id="facadeSide"></select>
+          </label>
+          <label>
+            Preset
+            <select id="facadePreset"></select>
+          </label>
+          <div class="actions">
+            <button id="loadPreset">Load preset</button>
+            <button id="applyFacade" class="primary">Apply JSON</button>
+          </div>
+          <textarea id="facadeEditor" spellcheck="false"></textarea>
+          <p class="hint">
+            Zones consume vertical space in order. Rows then fit components across the wall
+            using width ratios, minimum widths, repeat rules, and automatic scaling.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Selection</h2>
+          <div id="selectionInfo" class="selection-info">
+            Click a wall segment in the scene to inspect its facade assignment.
+          </div>
+        </div>
+      </aside>
+
+      <main class="viewport">
+        <div id="sceneMount"></div>
+        <div class="legend">
+          <span><strong>Orbit:</strong> drag</span>
+          <span><strong>Zoom:</strong> wheel</span>
+          <span><strong>Pan:</strong> right-drag</span>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+  </html>
