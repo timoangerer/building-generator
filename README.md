@@ -31,7 +31,7 @@ The app now lands on a workbench home and exposes separate front-end tool views:
 
 ## Asset kits
 
-The prototype now expects each source kit to have a sidecar manifest. The starter Venice kit lives at [assets/Venice modular building parts/kit.json](/Users/timoangerer/devel/games/worktrees/cold-crabs-repeat-8pg/assets/Venice modular building parts/kit.json), and the adapter that normalizes it lives at [asset-kits/venice-modular-building-parts.js](/Users/timoangerer/devel/games/worktrees/cold-crabs-repeat-8pg/asset-kits/venice-modular-building-parts.js).
+The Venice kit adapter now scans the real `.glb` files under [assets/venice_modular_building_parts](/Users/timoangerer/conductor/workspaces/building-generator/jerusalem/assets/venice_modular_building_parts) through a Vite glob and derives semantic records from filename structure such as `Venice_Windows_A_004.glb`. The adapter lives at [asset-kits/venice-modular-building-parts.js](/Users/timoangerer/conductor/workspaces/building-generator/jerusalem/asset-kits/venice-modular-building-parts.js).
 
 The facade DSL can stay semantic and optionally add `assetQuery` hints:
 
