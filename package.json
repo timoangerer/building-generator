@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup-workspace": "bash ./scripts/setup-workspace.sh",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
