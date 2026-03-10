@@ -1,15 +1,17 @@
 :root {
   color-scheme: light;
-  --bg: #ece6d7;
-  --panel: rgba(253, 250, 243, 0.88);
-  --panel-strong: rgba(248, 242, 229, 0.96);
-  --text: #201a14;
-  --muted: #6a5c4f;
-  --line: rgba(58, 44, 30, 0.18);
-  --accent: #9f5a2b;
-  --accent-strong: #7f4419;
-  --shadow: 0 18px 60px rgba(35, 20, 10, 0.12);
-  --radius: 22px;
+  --bg: #efe3d2;
+  --panel: rgba(255, 249, 240, 0.9);
+  --panel-strong: rgba(250, 241, 229, 0.97);
+  --panel-soft: rgba(255, 253, 249, 0.72);
+  --text: #21170f;
+  --muted: #6d5b4f;
+  --line: rgba(71, 50, 29, 0.15);
+  --accent: #ab5f2f;
+  --accent-strong: #7d3e13;
+  --accent-soft: rgba(171, 95, 47, 0.1);
+  --shadow: 0 24px 70px rgba(45, 29, 12, 0.12);
+  --radius: 24px;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
@@ -33,12 +35,12 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: 410px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
-  padding: 22px;
+  padding: 22px 20px 28px;
   overflow-y: auto;
   backdrop-filter: blur(20px);
 }
@@ -54,7 +56,7 @@ body {
 
 .brand {
   background:
-    linear-gradient(160deg, rgba(255, 249, 239, 0.95), rgba(241, 230, 210, 0.85)),
+    linear-gradient(160deg, rgba(255, 248, 236, 0.95), rgba(239, 226, 203, 0.84)),
     var(--panel-strong);
 }
 
@@ -83,8 +85,7 @@ h2 {
 }
 
 .intro,
-.hint,
-.selection-info {
+.hint {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
@@ -150,65 +151,22 @@ button.primary {
   color: #fff8ef;
 }
 
-.viewport {
-  position: relative;
+.workspace {
   min-width: 0;
   min-height: 100vh;
+  padding: 24px 24px 18px 0;
 }
 
-.viewport-shell {
+.workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 100vh;
-  transition: grid-template-columns 220ms ease;
+  grid-template-columns: minmax(0, 1.28fr) minmax(360px, 0.72fr);
+  gap: 18px;
+  min-height: calc(100vh - 88px);
 }
 
-.viewport-shell.focus-active {
-  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
-}
-
-#sceneMount {
-  position: relative;
-  min-height: 100vh;
-}
-
-#sceneMount canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.facade-focus {
-  display: none;
-  gap: 16px;
-  align-content: start;
-  padding: 22px 20px 84px 0;
-}
-
-.viewport-shell.focus-active .facade-focus {
-  display: grid;
-}
-
-.focus-header,
-.focus-card {
+.workbench-stage,
+.inspector-card {
   background: rgba(252, 247, 238, 0.94);
-  border: 1px solid rgba(58, 44, 30, 0.12);
-  border-radius: 24px;
-  box-shadow: var(--shadow);
-}
-
-.focus-header {
-  padding: 18px;
-}
-
-.focus-subtitle {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.focus-card {
-  padding: 16px;
 }
 
 .focus-card-header {
@@ -219,7 +177,7 @@ button.primary {
   margin-bottom: 12px;
 }
 
-.focus-card h3 {
+.focus-card-header h3 {
   margin: 0;
   font-size: 16px;
   font-family: Georgia, "Times New Roman", serif;
@@ -232,7 +190,7 @@ button.primary {
   min-height: 30px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(159, 90, 43, 0.1);
+  background: var(--accent-soft);
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 600;
@@ -245,11 +203,18 @@ button.primary {
 
 .elevation-preview {
   width: 100%;
+  min-height: 620px;
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(236, 228, 212, 0.96)),
     linear-gradient(135deg, rgba(255, 255, 255, 0.6), transparent 65%);
   border: 1px solid rgba(58, 44, 30, 0.1);
+}
+
+.inspector-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
 }
 
 .component-library {
@@ -287,8 +252,7 @@ button.primary {
 }
 
 .library-thumb.window::before,
-.library-thumb.glass::before,
-.library-thumb.screen::before {
+.library-thumb.glass::before {
   top: 18px;
   width: 46px;
   height: 56px;
@@ -318,119 +282,193 @@ button.primary {
   top: 4px;
   width: 54px;
   height: 30px;
-  border: 6px solid rgba(197, 176, 151, 0.95);
-  border-bottom: 0;
-  border-radius: 54px 54px 0 0;
+  background: rgba(197, 176, 151, 0.95);
+  border-radius: 30px 30px 0 0;
 }
 
 .library-thumb.oculus::before {
   top: 22px;
   width: 54px;
   height: 54px;
-  background: rgba(122, 156, 172, 0.82);
-  border: 8px solid rgba(197, 176, 151, 0.95);
   border-radius: 50%;
+  background: rgba(122, 156, 172, 0.92);
+  border: 8px solid rgba(197, 176, 151, 0.95);
 }
 
-.library-thumb.screen::after {
-  top: 18px;
-  width: 8px;
-  height: 56px;
+.library-thumb.screen::before {
+  top: 16px;
+  width: 58px;
+  height: 62px;
+  background: rgba(197, 176, 151, 0.95);
+  border-radius: 8px;
+}
+
+.library-thumb.screen .shape {
+  top: 20px;
+  width: 10px;
+  height: 54px;
   background: rgba(92, 83, 73, 0.95);
   box-shadow:
-    -14px 0 0 rgba(92, 83, 73, 0.95),
-    14px 0 0 rgba(92, 83, 73, 0.95);
+    -18px 0 0 rgba(92, 83, 73, 0.95),
+    18px 0 0 rgba(92, 83, 73, 0.95);
 }
 
 .library-thumb.balcony::before {
-  bottom: 18px;
-  width: 78px;
-  height: 14px;
-  background: rgba(138, 141, 146, 0.96);
+  top: 42px;
+  width: 70px;
+  height: 16px;
+  background: rgba(138, 141, 146, 0.95);
 }
 
 .library-thumb.balcony::after {
-  bottom: 30px;
-  width: 72px;
-  height: 26px;
-  border: 4px solid rgba(92, 83, 73, 0.95);
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-}
-
-.library-thumb.screen .shape,
-.library-thumb.unknown .shape {
-  top: 18px;
-  width: 56px;
-  height: 56px;
-  background: rgba(197, 176, 151, 0.6);
+  top: 24px;
+  width: 62px;
+  height: 6px;
+  background: rgba(92, 83, 73, 0.92);
 }
 
 .library-thumb.unknown::before {
-  top: 14px;
-  width: 60px;
-  height: 60px;
-  background: rgba(197, 176, 151, 0.55);
-  transform: translateX(-50%) rotate(45deg);
+  top: 18px;
+  width: 62px;
+  height: 58px;
+  border: 2px dashed rgba(92, 83, 73, 0.4);
 }
 
 .library-card h4,
-.library-card p {
+.summary-block h3 {
+  margin: 0 0 6px;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.library-card p,
+.summary-copy,
+.summary-list li {
   margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
-.library-card h4 {
-  font-size: 14px;
+.library-card p + p {
+  margin-top: 8px;
+}
+
+.summary-block {
+  margin-bottom: 16px;
+}
+
+.summary-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-grid article {
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--panel-soft);
+  border: 1px solid rgba(58, 44, 30, 0.08);
+}
+
+.metric-grid span {
+  display: block;
   margin-bottom: 6px;
-}
-
-.library-card p {
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.45;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.metric-grid strong {
+  font-size: 24px;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.summary-list + .summary-list {
+  margin-top: 16px;
+}
+
+.summary-list ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.export-output {
+  min-height: 260px;
+}
+
+.stage-mount {
+  position: relative;
+  min-height: 320px;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.45), transparent 35%),
+    linear-gradient(180deg, rgba(255, 250, 242, 0.84), rgba(224, 206, 181, 0.88));
+  border: 1px solid rgba(58, 44, 30, 0.1);
+}
+
+.stage-mount canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .legend {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
-  padding: 12px 14px;
-  border-radius: 999px;
-  background: rgba(251, 248, 240, 0.86);
-  border: 1px solid rgba(58, 44, 30, 0.12);
-  box-shadow: var(--shadow);
-  font-size: 13px;
+  margin: 16px 0 0;
+  padding: 0 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 strong {
-  color: var(--accent-strong);
+  color: var(--text);
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .viewport-shell.focus-active {
+  .workspace {
+    padding: 0 20px 20px;
+  }
+
+  .workbench {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
+}
 
-  .facade-focus {
-    padding: 0 16px 90px;
-  }
-
-  .viewport {
-    min-height: 62vh;
-  }
-
+@media (max-width: 720px) {
   .sidebar {
-    padding-bottom: 0;
+    padding: 16px;
   }
 
-  #sceneMount {
-    min-height: 62vh;
+  .workspace {
+    padding: 0 16px 16px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .elevation-preview {
+    min-height: 420px;
   }
 }

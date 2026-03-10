@@ -3,26 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Procedural Building Generator</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>Facade Rule Workbench</title>
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="panel brand">
           <p class="eyebrow">Procedural Architecture Lab</p>
-          <h1>Facade-first 3D building generator</h1>
+          <h1>Facade rule workbench</h1>
           <p class="intro">
-            Generate plot footprints, extrude them, then control each facade with a
-            JSON layout language that behaves like a building-aware flex/grid system.
+            Author facade JSON against a single wall contract first. The same resolved
+            layout can then drive SVG, structured verification output, and a thin 3D
+            extrusion preview before it ever touches full building generation.
           </p>
         </div>
 
         <div class="panel">
-          <h2>Building</h2>
+          <h2>Wall target</h2>
           <label>
-            Plot shape
-            <select id="plotType"></select>
+            Facade side
+            <select id="facadeSide"></select>
+          </label>
+          <label>
+            Preset
+            <select id="facadePreset"></select>
+          </label>
+          <label>
+            Wall width
+            <input id="wallWidth" type="range" min="8" max="36" step="0.5" value="18" />
+            <span id="wallWidthValue">18.0m</span>
           </label>
           <label>
             Floors
@@ -35,97 +44,109 @@
             <span id="floorHeightValue">3.4m</span>
           </label>
           <label>
-            Seed
-            <input id="seed" type="number" min="1" max="999999" step="1" value="1337" />
-          </label>
-          <div class="actions">
-            <button id="randomizeShape">Random plot</button>
-            <button id="randomizeAll">Randomize all</button>
-            <button id="regenerate" class="primary">Generate</button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h2>Facade DSL</h2>
-          <label>
-            Edit side
-            <select id="facadeSide"></select>
-          </label>
-          <label>
-            Preset
-            <select id="facadePreset"></select>
+            Preview depth
+            <input id="previewDepth" type="range" min="0.8" max="5" step="0.1" value="2.6" />
+            <span id="previewDepthValue">2.6m</span>
           </label>
           <div class="actions">
             <button id="loadPreset">Load preset</button>
+            <button id="focusPreview" class="primary">Center 3D view</button>
+          </div>
+          <p class="hint">Resolved wall height: <strong id="totalHeightValue">17.0m</strong></p>
+        </div>
+
+        <div class="panel">
+          <h2>Facade JSON</h2>
+          <div class="actions">
             <button id="applyFacade" class="primary">Apply JSON</button>
           </div>
           <textarea id="facadeEditor" spellcheck="false"></textarea>
           <p class="hint">
-            Zones consume vertical space in order. Rows then fit components across the wall
-            using width ratios, minimum widths, repeat rules, and automatic scaling.
+            Zones resolve vertically, rows repeat by floor when requested, and items fit
+            across the wall using ratios, min/max widths, repeat rules, and automatic scaling.
           </p>
         </div>
 
         <div class="panel">
-          <h2>Selection</h2>
-          <div id="selectionInfo" class="selection-info">
-            Click a wall segment in the scene to inspect its facade assignment.
-          </div>
+          <h2>Verification export</h2>
+          <label>
+            Output view
+            <select id="exportView">
+              <option value="report">Plain text report</option>
+              <option value="snapshot">JSON snapshot</option>
+              <option value="svg">SVG export</option>
+            </select>
+          </label>
           <div class="actions">
-            <button id="toggleFocus" disabled>Open facade focus</button>
+            <button id="downloadReport">Download report</button>
+            <button id="downloadSnapshot">Download snapshot</button>
+            <button id="downloadSvg">Download SVG</button>
           </div>
+          <p class="hint">
+            These exports are meant to be fed into tests or external agents so the facade can
+            be verified without opening the app.
+          </p>
         </div>
       </aside>
 
-      <main class="viewport">
-        <div id="viewportShell" class="viewport-shell">
-          <div id="sceneMount"></div>
-          <section id="facadeFocus" class="facade-focus" aria-hidden="true">
-            <div class="focus-header">
+      <main class="workspace">
+        <section class="workbench">
+          <div class="panel workbench-stage">
+            <div class="focus-card-header">
               <div>
-                <p class="eyebrow">Facade Focus</p>
-                <h2 id="focusTitle">Select a wall</h2>
-                <p id="focusSubtitle" class="focus-subtitle">
-                  Pick a facade to open a flat elevation preview next to the 3D scene.
-                </p>
+                <p class="eyebrow">Primary preview</p>
+                <h2>2D facade elevation</h2>
               </div>
-              <div class="actions">
-                <button id="alignFocusView">Align 3D view</button>
-                <button id="closeFocus">Close</button>
-              </div>
+              <span id="previewStatus" class="preview-status">Applied facade</span>
             </div>
+            <svg
+              id="elevationPreview"
+              class="elevation-preview"
+              viewBox="0 0 1200 860"
+              preserveAspectRatio="xMidYMid meet"
+              aria-label="Facade elevation preview"
+            ></svg>
+          </div>
 
-            <div class="focus-card">
-              <div class="focus-card-header">
-                <h3>Elevation preview</h3>
-                <span id="previewStatus" class="preview-status">Applied facade</span>
-              </div>
-              <svg
-                id="elevationPreview"
-                class="elevation-preview"
-                viewBox="0 0 1000 720"
-                preserveAspectRatio="xMidYMid meet"
-                aria-label="Flat facade preview"
-              ></svg>
-            </div>
+          <div class="inspector-column">
+            <section class="panel inspector-card">
+              <div id="summaryPanel"></div>
+            </section>
 
-            <div class="focus-card">
+            <section class="panel inspector-card">
               <div class="focus-card-header">
                 <h3>Component library</h3>
-                <span class="preview-status">Type-based</span>
+                <span class="preview-status">Resolved types</span>
               </div>
               <div id="componentLibrary" class="component-library"></div>
-            </div>
-          </section>
-        </div>
+            </section>
+
+            <section class="panel inspector-card">
+              <div class="focus-card-header">
+                <h3>Verification output</h3>
+                <span class="preview-status">Copy-ready</span>
+              </div>
+              <textarea id="exportOutput" class="export-output" readonly spellcheck="false"></textarea>
+            </section>
+
+            <section class="panel inspector-card">
+              <div class="focus-card-header">
+                <h3>3D extrusion preview</h3>
+                <span class="preview-status">Secondary view</span>
+              </div>
+              <div id="stageMount" class="stage-mount"></div>
+            </section>
+          </div>
+        </section>
+
         <div class="legend">
-          <span><strong>Orbit:</strong> drag</span>
-          <span><strong>Zoom:</strong> wheel</span>
-          <span><strong>Pan:</strong> right-drag</span>
+          <span><strong>Rule engine:</strong> pure wall-based layout contract</span>
+          <span><strong>Exports:</strong> report, snapshot, SVG</span>
+          <span><strong>3D preview:</strong> orbit and wheel to zoom</span>
         </div>
       </main>
     </div>
 
-    <script type="module" src="./main.js"></script>
+    <script type="module" src="./src/main.js"></script>
   </body>
-  </html>
+</html>
