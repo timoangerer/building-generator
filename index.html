@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Procedural Building Generator</title>
     <link rel="stylesheet" href="./styles.css" />
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js"
-        }
-      }
-    </script>
   </head>
   <body>
     <div class="app-shell">
@@ -78,11 +71,53 @@
           <div id="selectionInfo" class="selection-info">
             Click a wall segment in the scene to inspect its facade assignment.
           </div>
+          <div class="actions">
+            <button id="toggleFocus" disabled>Open facade focus</button>
+          </div>
         </div>
       </aside>
 
       <main class="viewport">
-        <div id="sceneMount"></div>
+        <div id="viewportShell" class="viewport-shell">
+          <div id="sceneMount"></div>
+          <section id="facadeFocus" class="facade-focus" aria-hidden="true">
+            <div class="focus-header">
+              <div>
+                <p class="eyebrow">Facade Focus</p>
+                <h2 id="focusTitle">Select a wall</h2>
+                <p id="focusSubtitle" class="focus-subtitle">
+                  Pick a facade to open a flat elevation preview next to the 3D scene.
+                </p>
+              </div>
+              <div class="actions">
+                <button id="alignFocusView">Align 3D view</button>
+                <button id="closeFocus">Close</button>
+              </div>
+            </div>
+
+            <div class="focus-card">
+              <div class="focus-card-header">
+                <h3>Elevation preview</h3>
+                <span id="previewStatus" class="preview-status">Applied facade</span>
+              </div>
+              <svg
+                id="elevationPreview"
+                class="elevation-preview"
+                viewBox="0 0 1000 720"
+                preserveAspectRatio="xMidYMid meet"
+                aria-label="Flat facade preview"
+              ></svg>
+            </div>
+
+            <div class="focus-card">
+              <div class="focus-card-header">
+                <h3>Component library</h3>
+                <span class="preview-status">Type-based</span>
+              </div>
+              <div id="componentLibrary" class="component-library"></div>
+            </div>
+          </section>
+        </div>
         <div class="legend">
           <span><strong>Orbit:</strong> drag</span>
           <span><strong>Zoom:</strong> wheel</span>

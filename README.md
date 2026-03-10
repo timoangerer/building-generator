@@ -1,6 +1,6 @@
 # building-generator
 
-Static browser prototype for procedural 3D buildings with:
+Vite-based browser prototype for procedural 3D buildings with:
 
 - random rectilinear plot generation (`square`, `rectangle`, `L`, `H`, `O`, courtyard)
 - plot extrusion into a 3D massing model
@@ -10,13 +10,21 @@ Static browser prototype for procedural 3D buildings with:
 
 ## Run
 
-Serve the folder locally, then open the printed URL:
+Install dependencies, start the dev server, then open the printed URL:
 
 ```bash
-python3 -m http.server 4173
+npm install
+npm run dev
 ```
 
-Then visit `http://localhost:4173`.
+The dev server runs on `http://localhost:3000` and preview stays on `http://localhost:4173`.
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
 
 ## Facade structure
 

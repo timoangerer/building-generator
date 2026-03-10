@@ -1,5 +1,5 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const plotTypes = ["square", "rectangle", "l-shape", "h-shape", "o-shape", "courtyard"];
 const facadeSides = ["north", "east", "south", "west", "inner"];
@@ -238,6 +238,16 @@ const seedInput = document.querySelector("#seed");
 const facadeSideSelect = document.querySelector("#facadeSide");
 const facadePresetSelect = document.querySelector("#facadePreset");
 const facadeEditor = document.querySelector("#facadeEditor");
+const viewportShell = document.querySelector("#viewportShell");
+const toggleFocusButton = document.querySelector("#toggleFocus");
+const facadeFocus = document.querySelector("#facadeFocus");
+const focusTitle = document.querySelector("#focusTitle");
+const focusSubtitle = document.querySelector("#focusSubtitle");
+const previewStatus = document.querySelector("#previewStatus");
+const elevationPreview = document.querySelector("#elevationPreview");
+const componentLibrary = document.querySelector("#componentLibrary");
+const alignFocusViewButton = document.querySelector("#alignFocusView");
+const closeFocusButton = document.querySelector("#closeFocus");
 
 for (const type of plotTypes) {
   const option = document.createElement("option");
@@ -269,6 +279,7 @@ const state = {
   facades: structuredClone(defaultFacadeMap),
   selectedSide: facadeSideSelect.value,
   selectedSegment: null,
+  focusMode: false,
 };
 
 const scene = new THREE.Scene();
@@ -338,6 +349,7 @@ const materials = {
 };
 
 let wallPickers = [];
+const svgNs = "http://www.w3.org/2000/svg";
 
 function createRng(seed) {
   let t = seed >>> 0;
@@ -357,11 +369,42 @@ function randomInt(rng, min, max) {
   return Math.floor(rng() * (max - min + 1)) + min;
 }
 
+function cloneSelectionSignature(segment) {
+  if (!segment) return null;
+  return {
+    side: segment.side,
+    isHole: segment.isHole,
+    length: segment.length,
+    center: segment.center.clone(),
+  };
+}
+
+function findMatchingSegment(wallSegments, selection) {
+  if (!selection) return null;
+  let best = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const segment of wallSegments) {
+    if (segment.side !== selection.side || segment.isHole !== selection.isHole) continue;
+    const centerDelta = segment.center.distanceTo(selection.center);
+    const score = centerDelta * 1.5 + Math.abs(segment.length - selection.length);
+    if (score < bestScore) {
+      best = segment;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
 function resize() {
   const { clientWidth, clientHeight } = mount;
   camera.aspect = clientWidth / clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(clientWidth, clientHeight);
+  if (state.focusMode && state.selectedSegment) {
+    alignCameraToSelectedSegment();
+  }
 }
 
 window.addEventListener("resize", resize);
@@ -834,6 +877,468 @@ function orientObjectToSegment(object, segment) {
   object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), outward);
 }
 
+function createSvgNode(tag, attributes = {}) {
+  const node = document.createElementNS(svgNs, tag);
+  for (const [key, value] of Object.entries(attributes)) {
+    node.setAttribute(key, String(value));
+  }
+  return node;
+}
+
+function createFacadePreviewData(segment, totalHeight, facade, floorHeight) {
+  const previewZones = [];
+  const components = new Map();
+  let cursorY = 0;
+
+  const registerComponent = (type, zoneKey) => {
+    const key = type || "unknown";
+    if (!components.has(key)) {
+      components.set(key, { type: key, count: 0, zones: new Set() });
+    }
+    const entry = components.get(key);
+    entry.count += 1;
+    if (zoneKey) entry.zones.add(zoneKey);
+  };
+
+  for (const zone of allocateZoneHeights(totalHeight, facade)) {
+    const contentWidth = Math.max(1.6, segment.length - 0.6 - (zone.inset || 0) * 2);
+    const rows = planRows(zone, contentWidth, zone.resolvedHeight, floorHeight).map((row) => {
+      const items = buildRowLayout(row, row.width).map((item) => {
+        registerComponent(item.type, zone.key);
+        if (item.balcony && row.floorIndex % item.balcony.every === 0) {
+          registerComponent("balcony", zone.key);
+        }
+        return item;
+      });
+
+      return {
+        ...row,
+        absoluteY: cursorY + row.y,
+        items,
+      };
+    });
+
+    previewZones.push({
+      key: zone.key,
+      inset: zone.inset || 0,
+      y: cursorY,
+      height: zone.resolvedHeight,
+      contentWidth,
+      rows,
+      ornaments: zone.ornaments || [],
+    });
+
+    cursorY += zone.resolvedHeight;
+  }
+
+  return {
+    totalHeight,
+    segmentLength: segment.length,
+    zones: previewZones,
+    components: [...components.values()].sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
+  };
+}
+
+function renderElevationPreview(previewData) {
+  elevationPreview.replaceChildren();
+
+  if (!previewData) {
+    const placeholder = createSvgNode("text", {
+      x: 500,
+      y: 360,
+      "text-anchor": "middle",
+      "font-size": 28,
+      "font-family": "Avenir Next, Segoe UI, sans-serif",
+      fill: "#6a5c4f",
+    });
+    placeholder.textContent = "Select a wall to preview its elevation";
+    elevationPreview.append(placeholder);
+    return;
+  }
+
+  const viewWidth = 1000;
+  const viewHeight = 720;
+  const padX = 78;
+  const padY = 42;
+  const wallWidth = viewWidth - padX * 2;
+  const wallHeight = viewHeight - padY * 2;
+  const scaleX = wallWidth / previewData.segmentLength;
+  const scaleY = wallHeight / previewData.totalHeight;
+  const centerX = viewWidth / 2;
+  const wallBottom = viewHeight - padY;
+  const wallLeft = centerX - wallWidth / 2;
+  const wallTop = padY;
+  const toX = (value) => centerX + value * scaleX;
+  const toY = (value) => wallBottom - value * scaleY;
+  const baseRect = createSvgNode("rect", {
+    x: wallLeft,
+    y: wallTop,
+    width: wallWidth,
+    height: wallHeight,
+    rx: 26,
+    fill: "#efe7d8",
+    stroke: "rgba(80, 61, 41, 0.24)",
+    "stroke-width": 2,
+  });
+  elevationPreview.append(baseRect);
+
+  for (let i = 0; i < previewData.zones.length; i += 1) {
+    const zone = previewData.zones[i];
+    const zoneTop = toY(zone.y + zone.height);
+    const zoneBottom = toY(zone.y);
+    const contentX = toX(-zone.contentWidth / 2);
+    const overlay = createSvgNode("rect", {
+      x: contentX,
+      y: zoneTop,
+      width: zone.contentWidth * scaleX,
+      height: zoneBottom - zoneTop,
+      fill: i % 2 === 0 ? "rgba(255,255,255,0.18)" : "rgba(159, 90, 43, 0.05)",
+      stroke: "rgba(80, 61, 41, 0.1)",
+      "stroke-width": 1,
+      rx: 14,
+    });
+    elevationPreview.append(overlay);
+
+    const label = createSvgNode("text", {
+      x: wallLeft + 12,
+      y: zoneTop + 22,
+      "font-size": 14,
+      "font-family": "Avenir Next, Segoe UI, sans-serif",
+      "font-weight": 600,
+      fill: "#7f4419",
+    });
+    label.textContent = zone.key;
+    elevationPreview.append(label);
+
+    const divider = createSvgNode("line", {
+      x1: wallLeft,
+      y1: zoneTop,
+      x2: wallLeft + wallWidth,
+      y2: zoneTop,
+      stroke: "rgba(80, 61, 41, 0.14)",
+      "stroke-width": 1,
+    });
+    elevationPreview.append(divider);
+
+    for (const row of zone.rows) {
+      const rowBottom = toY(row.absoluteY);
+      const rowCenterY = toY(row.absoluteY + row.resolvedHeight / 2);
+      for (const item of row.items) {
+        const itemHeight = Math.min(
+          row.resolvedHeight * 0.74,
+          item.type === "door" || item.type === "entry" ? row.resolvedHeight * 0.9 : row.resolvedHeight * 0.68
+        );
+        const frameX = toX(item.x - item.width / 2);
+        const frameY = rowCenterY - itemHeight * scaleY / 2;
+        const frameWidth = item.width * scaleX;
+        const frameHeight = itemHeight * scaleY;
+
+        const frame = createSvgNode("rect", {
+          x: frameX,
+          y: frameY,
+          width: frameWidth,
+          height: frameHeight,
+          rx: item.type === "oculus" ? frameWidth / 2 : 8,
+          fill: item.type === "door" || item.type === "entry" ? "#d0bfaa" : "#c5b097",
+          stroke: "rgba(80, 61, 41, 0.25)",
+          "stroke-width": 1.5,
+        });
+        elevationPreview.append(frame);
+
+        if (item.type === "window" || item.type === "glass") {
+          elevationPreview.append(
+            createSvgNode("rect", {
+              x: frameX + frameWidth * 0.12,
+              y: frameY + frameHeight * 0.11,
+              width: frameWidth * 0.76,
+              height: frameHeight * 0.78,
+              rx: 6,
+              fill: "#8fb0bf",
+              opacity: item.type === "glass" ? 0.95 : 0.88,
+            })
+          );
+          if (item.sill) {
+            elevationPreview.append(
+              createSvgNode("rect", {
+                x: frameX + frameWidth * 0.08,
+                y: frameY + frameHeight * 0.92,
+                width: frameWidth * 0.84,
+                height: 5,
+                rx: 3,
+                fill: "#c5b097",
+              })
+            );
+          }
+        } else if (item.type === "door" || item.type === "entry") {
+          elevationPreview.append(
+            createSvgNode("rect", {
+              x: frameX + frameWidth * 0.14,
+              y: frameY + frameHeight * 0.12,
+              width: frameWidth * 0.72,
+              height: frameHeight * 0.88,
+              rx: 6,
+              fill: "#5c5349",
+            })
+          );
+          if (item.arch) {
+            elevationPreview.append(
+              createSvgNode("path", {
+                d: `M ${frameX + frameWidth * 0.24} ${frameY + frameHeight * 0.3} A ${frameWidth * 0.26} ${
+                  frameHeight * 0.26
+                } 0 0 1 ${frameX + frameWidth * 0.76} ${frameY + frameHeight * 0.3}`,
+                fill: "none",
+                stroke: "#c5b097",
+                "stroke-width": 6,
+                "stroke-linecap": "round",
+              })
+            );
+          }
+        } else if (item.type === "oculus") {
+          elevationPreview.append(
+            createSvgNode("circle", {
+              cx: frameX + frameWidth / 2,
+              cy: frameY + frameHeight / 2,
+              r: Math.min(frameWidth, frameHeight) * 0.26,
+              fill: "#8fb0bf",
+            })
+          );
+        } else if (item.type === "screen") {
+          for (let slat = -2; slat <= 2; slat += 1) {
+            elevationPreview.append(
+              createSvgNode("rect", {
+                x: frameX + frameWidth / 2 + slat * frameWidth * 0.16 - 4,
+                y: frameY + frameHeight * 0.08,
+                width: 8,
+                height: frameHeight * 0.84,
+                rx: 3,
+                fill: "#5c5349",
+              })
+            );
+          }
+        }
+
+        if (item.header === "lintel") {
+          elevationPreview.append(
+            createSvgNode("rect", {
+              x: frameX - frameWidth * 0.05,
+              y: frameY - 8,
+              width: frameWidth * 1.1,
+              height: 8,
+              rx: 4,
+              fill: "#c5b097",
+            })
+          );
+        } else if (item.header === "pediment") {
+          elevationPreview.append(
+            createSvgNode("path", {
+              d: `M ${frameX + frameWidth * 0.08} ${frameY - 1} L ${frameX + frameWidth / 2} ${
+                frameY - 18
+              } L ${frameX + frameWidth * 0.92} ${frameY - 1} Z`,
+              fill: "#c5b097",
+            })
+          );
+        } else if (item.header === "arch") {
+          elevationPreview.append(
+            createSvgNode("path", {
+              d: `M ${frameX + frameWidth * 0.18} ${frameY + 2} A ${frameWidth * 0.32} ${frameHeight * 0.22} 0 0 1 ${
+                frameX + frameWidth * 0.82
+              } ${frameY + 2}`,
+              fill: "none",
+              stroke: "#c5b097",
+              "stroke-width": 6,
+              "stroke-linecap": "round",
+            })
+          );
+        }
+
+        if (item.balcony && row.floorIndex % item.balcony.every === 0) {
+          const slabDepth = Math.max(10, frameHeight * 0.12);
+          const slabY = rowBottom - frameHeight * 0.1;
+          elevationPreview.append(
+            createSvgNode("rect", {
+              x: frameX + frameWidth * 0.04,
+              y: slabY,
+              width: frameWidth * 0.92,
+              height: slabDepth,
+              rx: 4,
+              fill: "#8a8d92",
+            })
+          );
+          elevationPreview.append(
+            createSvgNode("rect", {
+              x: frameX + frameWidth * 0.08,
+              y: slabY - frameHeight * 0.24,
+              width: frameWidth * 0.84,
+              height: 4,
+              fill: "#5c5349",
+            })
+          );
+        }
+      }
+    }
+
+    for (const ornament of zone.ornaments) {
+      const ornamentY = toY(zone.y + ornament.offsetY);
+      elevationPreview.append(
+        createSvgNode("rect", {
+          x: wallLeft,
+          y: ornamentY - Math.max(2, ornament.size * scaleY * 0.5),
+          width: wallWidth,
+          height: Math.max(4, ornament.size * scaleY),
+          rx: 3,
+          fill: "#c5b097",
+          opacity: ornament.type === "band" ? 0.75 : 0.92,
+        })
+      );
+    }
+  }
+}
+
+function renderComponentLibrary(components) {
+  componentLibrary.replaceChildren();
+
+  if (!components.length) {
+    const empty = document.createElement("p");
+    empty.className = "focus-subtitle";
+    empty.textContent = "No facade components found in this JSON.";
+    componentLibrary.append(empty);
+    return;
+  }
+
+  for (const component of components) {
+    const card = document.createElement("article");
+    card.className = "library-card";
+
+    const thumb = document.createElement("div");
+    const thumbClass = /^(window|glass|door|entry|oculus|screen|balcony)$/.test(component.type)
+      ? component.type
+      : "unknown";
+    thumb.className = `library-thumb ${thumbClass}`;
+    if (thumbClass === "screen" || thumbClass === "unknown") {
+      const shape = document.createElement("div");
+      shape.className = "shape";
+      thumb.append(shape);
+    }
+
+    const title = document.createElement("h4");
+    title.textContent = component.type;
+
+    const meta = document.createElement("p");
+    const zoneList = [...component.zones].join(", ");
+    meta.textContent = `${component.count} instance${component.count === 1 ? "" : "s"} on this segment${
+      zoneList ? ` • ${zoneList}` : ""
+    }`;
+
+    const note = document.createElement("p");
+    note.textContent = `Preview key: "${component.type}"`;
+
+    card.append(thumb, title, meta, note);
+    componentLibrary.append(card);
+  }
+}
+
+function getPreviewFacadeState() {
+  const appliedFacade = state.facades[state.selectedSide];
+  const source = { facade: appliedFacade, mode: "applied", error: null };
+
+  if (!facadeEditor.value.trim()) {
+    return source;
+  }
+
+  try {
+    return {
+      facade: JSON.parse(facadeEditor.value),
+      mode: "editor",
+      error: null,
+    };
+  } catch (error) {
+    return {
+      facade: appliedFacade,
+      mode: "fallback",
+      error,
+    };
+  }
+}
+
+function renderFocusPanel() {
+  if (!state.selectedSegment) {
+    focusTitle.textContent = "Select a wall";
+    focusSubtitle.textContent = "Pick a facade to open a flat elevation preview next to the 3D scene.";
+    previewStatus.textContent = "Applied facade";
+    previewStatus.classList.remove("error");
+    renderElevationPreview(null);
+    renderComponentLibrary([]);
+    return;
+  }
+
+  const previewFacadeState = getPreviewFacadeState();
+  const previewData = createFacadePreviewData(
+    state.selectedSegment,
+    state.floors * state.floorHeight,
+    previewFacadeState.facade,
+    state.floorHeight
+  );
+
+  focusTitle.textContent = `${state.selectedSegment.side} facade • ${state.selectedSegment.length.toFixed(1)}m`;
+  focusSubtitle.textContent =
+    state.selectedSide === state.selectedSegment.side
+      ? `${state.selectedSegment.isHole ? "Inner" : "Outer"} wall aligned beside the 3D view.`
+      : `Previewing "${state.selectedSide}" JSON on the selected ${state.selectedSegment.side} wall.`;
+
+  if (previewFacadeState.mode === "editor") {
+    previewStatus.textContent = "Live from editor";
+    previewStatus.classList.remove("error");
+  } else if (previewFacadeState.mode === "fallback") {
+    previewStatus.textContent = `Invalid JSON, showing applied facade`;
+    previewStatus.classList.add("error");
+  } else {
+    previewStatus.textContent = "Applied facade";
+    previewStatus.classList.remove("error");
+  }
+
+  renderElevationPreview(previewData);
+  renderComponentLibrary(previewData.components);
+}
+
+function updateFocusUi() {
+  const active = state.focusMode && Boolean(state.selectedSegment);
+  viewportShell.classList.toggle("focus-active", active);
+  facadeFocus.setAttribute("aria-hidden", String(!active));
+  toggleFocusButton.disabled = !state.selectedSegment;
+  toggleFocusButton.textContent = active ? "Hide facade focus" : "Open facade focus";
+}
+
+function setFocusMode(enabled, { alignCamera = true } = {}) {
+  state.focusMode = Boolean(enabled && state.selectedSegment);
+  updateFocusUi();
+  if (!alignCamera && !state.focusMode) {
+    camera.aspect = mount.clientWidth / mount.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    return;
+  }
+  resize();
+}
+
+function alignCameraToSelectedSegment() {
+  if (!state.selectedSegment) return;
+
+  const totalHeight = state.floors * state.floorHeight;
+  const center = state.selectedSegment.center.clone().add(stage.position);
+  center.y = totalHeight / 2;
+
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const aspect = Math.max(0.4, mount.clientWidth / Math.max(1, mount.clientHeight));
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+  const widthDistance = (state.selectedSegment.length * 0.58) / Math.tan(horizontalFov / 2);
+  const heightDistance = (totalHeight * 0.62) / Math.tan(verticalFov / 2);
+  const distance = Math.max(10, widthDistance, heightDistance);
+
+  camera.position.copy(center).addScaledVector(state.selectedSegment.normal.clone().normalize(), distance);
+  controls.target.copy(center);
+  controls.update();
+}
+
 function refreshEditor() {
   const side = state.selectedSide;
   facadeEditor.value = JSON.stringify(state.facades[side], null, 2);
@@ -842,6 +1347,7 @@ function refreshEditor() {
 function updateSelectionInfo() {
   if (!state.selectedSegment) {
     selectionInfo.textContent = "Click a wall segment in the scene to inspect its facade assignment.";
+    toggleFocusButton.disabled = true;
     return;
   }
   selectionInfo.innerHTML = [
@@ -849,14 +1355,17 @@ function updateSelectionInfo() {
     `<strong>Length:</strong> ${state.selectedSegment.length.toFixed(2)}m`,
     `<strong>Inner wall:</strong> ${state.selectedSegment.isHole ? "yes" : "no"}`,
   ].join("<br>");
+  toggleFocusButton.disabled = false;
 }
 
 function rebuildScene() {
+  const previousSelection = cloneSelectionSignature(state.selectedSegment);
   wallPickers = [];
   stage.clear();
 
   const rng = createRng(state.seed);
   const footprint = generateFootprint(state.plotType, rng);
+  state.selectedSegment = findMatchingSegment(footprint.wallSegments, previousSelection);
   const totalHeight = state.floors * state.floorHeight;
 
   const buildingShape = footprint.shape;
@@ -906,6 +1415,21 @@ function rebuildScene() {
   stage.position.sub(center);
   stage.position.y = 0;
   controls.target.set(0, totalHeight * 0.45, 0);
+
+  if (state.selectedSegment) {
+    state.selectedSide = state.selectedSide || state.selectedSegment.side;
+    facadeSideSelect.value = state.selectedSide;
+  } else if (state.focusMode) {
+    state.focusMode = false;
+  }
+
+  updateSelectionInfo();
+  renderFocusPanel();
+  updateFocusUi();
+
+  if (state.focusMode && state.selectedSegment) {
+    alignCameraToSelectedSegment();
+  }
 }
 
 function applyFacadeJson() {
@@ -961,6 +1485,11 @@ seedInput.addEventListener("change", () => {
 facadeSideSelect.addEventListener("change", () => {
   state.selectedSide = facadeSideSelect.value;
   refreshEditor();
+  renderFocusPanel();
+});
+
+facadeEditor.addEventListener("input", () => {
+  renderFocusPanel();
 });
 
 document.querySelector("#regenerate").addEventListener("click", rebuildScene);
@@ -979,6 +1508,15 @@ document.querySelector("#applyFacade").addEventListener("click", () => {
   }
 });
 document.querySelector("#loadPreset").addEventListener("click", () => loadPreset(facadePresetSelect.value));
+toggleFocusButton.addEventListener("click", () => {
+  setFocusMode(!state.focusMode);
+});
+alignFocusViewButton.addEventListener("click", () => {
+  alignCameraToSelectedSegment();
+});
+closeFocusButton.addEventListener("click", () => {
+  setFocusMode(false, { alignCamera: false });
+});
 
 renderer.domElement.addEventListener("pointerdown", (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -992,6 +1530,8 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
     facadeSideSelect.value = state.selectedSide;
     refreshEditor();
     updateSelectionInfo();
+    renderFocusPanel();
+    setFocusMode(true);
   }
 });
 
@@ -1003,6 +1543,8 @@ function animate() {
 
 refreshEditor();
 updateSelectionInfo();
+renderFocusPanel();
+updateFocusUi();
 resize();
 rebuildScene();
 animate();
