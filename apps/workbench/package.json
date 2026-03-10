@@ -1,0 +1,20 @@
+{
+  "name": "@green-buses/workbench",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host :: --port 3000 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host :: --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@green-buses/facade-core": "0.1.0",
+    "@green-buses/facade-svg": "0.1.0",
+    "@green-buses/facade-three": "0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}

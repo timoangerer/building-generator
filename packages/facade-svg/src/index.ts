@@ -1,4 +1,14 @@
-function escapeHtml(value) {
+import type { FacadeLayout } from "@green-buses/facade-core";
+
+export interface RenderFacadeSvgOptions {
+  width?: number;
+  height?: number;
+  padX?: number;
+  padY?: number;
+  includeAnnotations?: boolean;
+}
+
+function escapeHtml(value: string): string {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -6,16 +16,16 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function round(value, digits = 2) {
+function round(value: number, digits = 2): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
 
-function buildSvgMarkup(layout, options = {}) {
-  const viewWidth = options.width || 1200;
-  const viewHeight = options.height || 860;
-  const padX = options.padX || 88;
-  const padY = options.padY || 52;
+function buildSvgMarkup(layout: FacadeLayout, options: RenderFacadeSvgOptions = {}) {
+  const viewWidth = options.width ?? 1200;
+  const viewHeight = options.height ?? 860;
+  const padX = options.padX ?? 88;
+  const padY = options.padY ?? 52;
   const includeAnnotations = options.includeAnnotations ?? true;
 
   const wallWidth = viewWidth - padX * 2;
@@ -28,9 +38,9 @@ function buildSvgMarkup(layout, options = {}) {
   const wallTop = padY;
   const wallRight = wallLeft + wallWidth;
 
-  const toX = (value) => centerX + value * scaleX;
-  const toY = (value) => wallBottom - value * scaleY;
-  const parts = [];
+  const toX = (value: number): number => centerX + value * scaleX;
+  const toY = (value: number): number => wallBottom - value * scaleY;
+  const parts: string[] = [];
 
   parts.push(`
     <defs>
@@ -52,8 +62,7 @@ function buildSvgMarkup(layout, options = {}) {
     `<rect x="${wallLeft}" y="${wallTop}" width="${wallWidth}" height="${wallHeight}" rx="28" fill="url(#wallFill)" stroke="rgba(80,61,41,0.24)" stroke-width="2" filter="url(#softShadow)" />`
   );
 
-  for (let index = 0; index < layout.zones.length; index += 1) {
-    const zone = layout.zones[index];
+  for (const [index, zone] of layout.zones.entries()) {
     const zoneTop = toY(zone.y + zone.height);
     const zoneBottom = toY(zone.y);
     const contentX = toX(-zone.contentWidth / 2);
@@ -190,13 +199,17 @@ function buildSvgMarkup(layout, options = {}) {
   return { viewWidth, viewHeight, markup: parts.join("") };
 }
 
-export function renderFacadeSvg(svgElement, layout, options = {}) {
+export function renderFacadeSvg(
+  svgElement: SVGSVGElement,
+  layout: FacadeLayout,
+  options: RenderFacadeSvgOptions = {}
+): void {
   const { viewWidth, viewHeight, markup } = buildSvgMarkup(layout, options);
   svgElement.setAttribute("viewBox", `0 0 ${viewWidth} ${viewHeight}`);
   svgElement.innerHTML = markup;
 }
 
-export function createFacadeSvgString(layout, options = {}) {
+export function createFacadeSvgString(layout: FacadeLayout, options: RenderFacadeSvgOptions = {}): string {
   const { viewWidth, viewHeight, markup } = buildSvgMarkup(layout, options);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}" width="${viewWidth}" height="${viewHeight}" fill="none">${markup}</svg>`;
 }

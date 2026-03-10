@@ -1,4 +1,4 @@
-export const facadeSides = ["north", "east", "south", "west", "inner"];
+import type { FacadeDefinition, FacadeMap } from "./types";
 
 export const facadePresets = {
   classical: {
@@ -212,9 +212,9 @@ export const facadePresets = {
       },
     ],
   },
-};
+} satisfies Record<string, FacadeDefinition>;
 
-export const componentDescriptions = {
+export const componentDescriptions: Record<string, string> = {
   balcony: "Projected slab generated from balcony repeat rules.",
   door: "Solid ground-floor opening with optional arch treatment.",
   entry: "Larger glazed or framed entrance element.",
@@ -224,7 +224,7 @@ export const componentDescriptions = {
   window: "Standard framed window bay with optional sill/header.",
 };
 
-export function createDefaultFacadeMap() {
+export function createDefaultFacadeMap(): FacadeMap {
   return {
     north: structuredClone(facadePresets.classical),
     east: structuredClone(facadePresets.modern),

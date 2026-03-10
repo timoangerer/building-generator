@@ -1,34 +1,65 @@
-# building-generator
+# green-buses-cross
 
-Vite-based browser prototype for procedural 3D buildings with:
+Minimal TypeScript workspace for a browser-based facade workbench, organized so the pure layout engine stays separate from 2D and 3D adapters.
 
-- random rectilinear plot generation (`square`, `rectangle`, `L`, `H`, `O`, courtyard)
-- plot extrusion into a 3D massing model
-- a facade JSON/DSL with zones, rows, repeat-fit items, and ornaments
-- per-side facade editing for `north`, `east`, `south`, `west`, and `inner` walls
-- placeholder 3D architectural elements made from primitives
+## Workspace layout
 
-## Run
+```text
+apps/
+  workbench/        Vite app shell for editing and previewing facades
+packages/
+  facade-core/      facade types, presets, layout engine, verification exports
+  facade-svg/       2D SVG renderer/exporter
+  facade-three/     Three.js preview scene
+```
 
-Install dependencies, start the dev server, then open the printed URL:
+## Why this shape
+
+- `facade-core` is pure domain logic and can be reused by tests, tools, and future generators.
+- `facade-svg` and `facade-three` are thin adapters over the resolved layout contract.
+- `apps/workbench` stays simple: vanilla TypeScript plus Vite, no framework overhead until the project actually needs it.
+- npm workspaces are enough for the current size and keep dependency management straightforward.
+
+This is the intended stack direction for more web 2D/3D work:
+
+- TypeScript everywhere
+- npm workspaces for the monorepo
+- Vite for the browser app
+- Three.js for 3D previews
+- SVG for lightweight 2D elevation output
+
+## Commands
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Run the workbench:
+
+```bash
 npm run dev
 ```
 
-The dev server runs on `http://localhost:3000` and preview stays on `http://localhost:4173`.
+Typecheck all workspaces:
 
-## Build
+```bash
+npm run typecheck
+```
+
+Build the app:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## Facade structure
+The dev server runs on `http://localhost:3000` and preview stays on `http://localhost:4173`.
 
-Each facade is JSON with this shape:
+## Facade JSON
+
+Each facade still uses the same wall-first structure:
 
 ```json
 {
@@ -70,4 +101,4 @@ Key layout rules:
 - `height` reserves exact meters in a zone, `flex` shares remaining wall height.
 - `repeatFloors` slices a row into as many floor bands as fit the zone height.
 - `repeatFit` packs items across the wall while preserving sensible width bounds.
-- if a row would overflow horizontally, the layout engine scales the row proportionally instead of distorting one item.
+- If a row would overflow horizontally, the layout engine scales the row proportionally instead of distorting one item.

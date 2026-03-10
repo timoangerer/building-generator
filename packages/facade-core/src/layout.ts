@@ -1,32 +1,43 @@
-function clamp(value, min, max) {
+import type {
+  ComponentSummary,
+  FacadeDefinition,
+  FacadeItem,
+  FacadeLayout,
+  PlannedRow,
+  PositionedRowItem,
+  ResolvedZone,
+  WallSpec,
+} from "./types";
+
+function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function round(value, digits = 2) {
+function round(value: number, digits = 2): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
 
-export function allocateZoneHeights(totalHeight, facade) {
-  const zones = facade?.zones || [];
-  const fixedHeight = zones.reduce((sum, zone) => sum + (zone.height || 0), 0);
+export function allocateZoneHeights(totalHeight: number, facade: FacadeDefinition): ResolvedZone[] {
+  const zones = facade.zones ?? [];
+  const fixedHeight = zones.reduce((sum, zone) => sum + (zone.height ?? 0), 0);
   const flexZones = zones.filter((zone) => zone.flex);
   const remaining = Math.max(0.1, totalHeight - fixedHeight);
-  const flexUnits = flexZones.reduce((sum, zone) => sum + zone.flex, 0) || 1;
+  const flexUnits = flexZones.reduce((sum, zone) => sum + (zone.flex ?? 0), 0) || 1;
 
   return zones.map((zone) => ({
     ...zone,
-    resolvedHeight: zone.height || (remaining * zone.flex) / flexUnits,
+    resolvedHeight: zone.height ?? (remaining * (zone.flex ?? 0)) / flexUnits,
   }));
 }
 
-export function planRows(zone, width, height, floorHeight) {
-  const rows = [];
+export function planRows(zone: ResolvedZone, width: number, height: number, floorHeight: number): PlannedRow[] {
+  const rows: PlannedRow[] = [];
   let cursorY = 0;
 
-  for (const row of zone.rows || []) {
+  for (const row of zone.rows ?? []) {
     if (row.repeatFloors) {
-      const repeatCount = Math.max(1, Math.floor(height / (row.heightPerFloor || floorHeight)));
+      const repeatCount = Math.max(1, Math.floor(height / (row.heightPerFloor ?? floorHeight)));
       const resolvedHeight = height / repeatCount;
       for (let index = 0; index < repeatCount; index += 1) {
         rows.push({
@@ -35,47 +46,49 @@ export function planRows(zone, width, height, floorHeight) {
           resolvedHeight,
           y: cursorY + index * resolvedHeight,
           floorIndex: index,
+          width,
         });
       }
       cursorY += height;
       continue;
     }
 
-    const resolvedHeight = (row.height || 1) * height;
+    const resolvedHeight = (row.height ?? 1) * height;
     rows.push({
       ...row,
       key: `${zone.key}-row-${rows.length}`,
       resolvedHeight,
       y: cursorY,
       floorIndex: 0,
+      width,
     });
     cursorY += resolvedHeight;
   }
 
-  return rows.map((row) => ({ ...row, width }));
+  return rows;
 }
 
-export function fitRepeatItem(item, availableWidth) {
-  const minWidth = item.minWidth || 1.2;
-  const maxWidth = item.maxWidth || availableWidth;
-  const gap = item.gap || 0.4;
+export function fitRepeatItem(item: FacadeItem, availableWidth: number): (FacadeItem & { resolvedWidth: number })[] {
+  const minWidth = item.minWidth ?? 1.2;
+  const maxWidth = item.maxWidth ?? availableWidth;
+  const gap = item.gap ?? 0.4;
   const count = Math.max(1, Math.floor((availableWidth + gap) / (minWidth + gap)));
   const totalGap = gap * Math.max(0, count - 1);
   const resolvedWidth = Math.min(maxWidth, (availableWidth - totalGap) / count);
   return Array.from({ length: count }, () => ({ ...item, resolvedWidth }));
 }
 
-export function buildRowLayout(row, width) {
-  const sourceItems = row.items || [];
+export function buildRowLayout(row: PlannedRow, width: number): PositionedRowItem[] {
+  const sourceItems = row.items ?? [];
   const fixedItems = sourceItems.filter((item) => !item.repeatFit);
   const repeatGroups = sourceItems.filter((item) => item.repeatFit);
 
-  const prepared = fixedItems.map((item) => ({
+  const prepared: Array<FacadeItem & { resolvedWidth: number }> = fixedItems.map((item) => ({
     ...item,
     resolvedWidth: clamp(
-      item.width || item.widthRatio || 1.5,
-      item.minWidth || 1,
-      item.maxWidth || width
+      item.width ?? item.widthRatio ?? 1.5,
+      item.minWidth ?? 1,
+      item.maxWidth ?? width
     ),
   }));
 
@@ -84,11 +97,11 @@ export function buildRowLayout(row, width) {
     (sum, item, index) => sum + (index < prepared.length - 1 ? item.gap ?? 0.5 : 0),
     0
   );
-  const repeatWeight = repeatGroups.reduce((sum, item) => sum + (item.widthRatio || 1), 0) || 1;
+  const repeatWeight = repeatGroups.reduce((sum, item) => sum + (item.widthRatio ?? 1), 0) || 1;
   const remainingWidth = Math.max(width * 0.25, width - fixedWidth - fixedGap - repeatGroups.length * 0.35);
 
   for (const item of repeatGroups) {
-    const slotWidth = (remainingWidth * (item.widthRatio || 1)) / repeatWeight;
+    const slotWidth = (remainingWidth * (item.widthRatio ?? 1)) / repeatWeight;
     prepared.push(...fitRepeatItem(item, slotWidth));
   }
 
@@ -102,48 +115,52 @@ export function buildRowLayout(row, width) {
   let cursor = -(width / 2) + (width - (totalWidth + totalGap) * scale) / 2;
   return prepared.map((item, index) => {
     const resolvedWidth = item.resolvedWidth * scale;
-    const positioned = {
+    const positioned: PositionedRowItem = {
       ...item,
       x: cursor + resolvedWidth / 2,
       width: resolvedWidth,
       index,
+      resolvedWidth,
     };
     cursor += resolvedWidth + (item.gap ?? 0.5) * scale;
     return positioned;
   });
 }
 
-export function resolveElementHeight(item, rowHeight) {
+export function resolveElementHeight(item: FacadeItem, rowHeight: number): number {
   return Math.min(
     rowHeight * 0.74,
     item.type === "door" || item.type === "entry" ? rowHeight * 0.9 : rowHeight * 0.68
   );
 }
 
-export function buildFacadeLayout(wall, facade) {
-  const zones = [];
-  const components = new Map();
+export function buildFacadeLayout(wall: WallSpec, facade: FacadeDefinition): FacadeLayout {
+  const zones: FacadeLayout["zones"] = [];
+  const components = new Map<string, { type: string; count: number; zones: Set<string> }>();
   let cursorY = 0;
 
-  const registerComponent = (type, zoneKey) => {
-    const key = type || "unknown";
+  const registerComponent = (type: string | undefined, zoneKey: string): void => {
+    const key = type ?? "unknown";
     if (!components.has(key)) {
       components.set(key, { type: key, count: 0, zones: new Set() });
     }
     const entry = components.get(key);
+    if (!entry) return;
     entry.count += 1;
-    if (zoneKey) entry.zones.add(zoneKey);
+    entry.zones.add(zoneKey);
   };
 
   for (const zone of allocateZoneHeights(wall.height, facade)) {
-    const inset = zone.inset || 0;
+    const inset = zone.inset ?? 0;
     const contentWidth = Math.max(1.6, wall.width - 0.6 - inset * 2);
     const rows = planRows(zone, contentWidth, zone.resolvedHeight, wall.floorHeight).map((row) => {
       const rowCenterY = cursorY + row.y + row.resolvedHeight / 2;
       const items = buildRowLayout(row, row.width).map((item) => {
         const hasBalcony = Boolean(item.balcony && row.floorIndex % item.balcony.every === 0);
         registerComponent(item.type, zone.key);
-        if (hasBalcony) registerComponent("balcony", zone.key);
+        if (hasBalcony) {
+          registerComponent("balcony", zone.key);
+        }
 
         return {
           ...item,
@@ -170,20 +187,21 @@ export function buildFacadeLayout(wall, facade) {
       inset,
       contentWidth,
       rows,
-      ornaments: zone.ornaments || [],
+      ornaments: zone.ornaments ?? [],
     });
     cursorY += zone.resolvedHeight;
   }
 
-  const componentList = [...components.values()]
+  const componentList: ComponentSummary[] = [...components.values()]
     .map((entry) => ({
-      ...entry,
+      type: entry.type,
+      count: entry.count,
       zones: [...entry.zones].sort(),
     }))
     .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
 
   return {
-    facadeName: facade?.name || "Custom",
+    facadeName: facade.name || "Custom",
     wall,
     zones,
     components: componentList,
@@ -199,7 +217,7 @@ export function buildFacadeLayout(wall, facade) {
   };
 }
 
-export function createVerificationSnapshot(layout) {
+export function createVerificationSnapshot(layout: FacadeLayout) {
   return {
     facade: layout.facadeName,
     wall: {
@@ -229,9 +247,9 @@ export function createVerificationSnapshot(layout) {
           centerY: round(item.centerY),
           width: round(item.width),
           visualHeight: round(item.visualHeight),
-          header: item.header || null,
+          header: item.header ?? null,
           sill: Boolean(item.sill),
-          balcony: item.hasBalcony ? item.balcony : null,
+          balcony: item.hasBalcony ? item.balcony ?? null : null,
         })),
       })),
       ornaments: zone.ornaments.map((ornament) => ({
@@ -248,7 +266,7 @@ export function createVerificationSnapshot(layout) {
   };
 }
 
-export function createVerificationReport(layout) {
+export function createVerificationReport(layout: FacadeLayout): string {
   const lines = [
     `Facade ${layout.facadeName}`,
     `Wall ${round(layout.wall.width)}m x ${round(layout.wall.height)}m on ${layout.wall.side}`,
