@@ -8,8 +8,8 @@ This keeps the facade DSL stable while allowing multiple source kits with differ
 
 ## Flow
 
-1. Source kit metadata lives beside the assets in a sidecar file such as [assets/Venice modular building parts/kit.json](/Users/timoangerer/devel/games/worktrees/cold-crabs-repeat-8pg/assets/Venice modular building parts/kit.json).
-2. A small source-specific adapter loads that file and normalizes it into a common part record shape.
+1. Source kit files live in a folder such as [assets/venice_modular_building_parts](/Users/timoangerer/conductor/workspaces/building-generator/jerusalem/assets/venice_modular_building_parts).
+2. A small source-specific adapter uses a build-time glob to discover those files and normalizes them into a common part record shape.
 3. The facade renderer asks the asset library for the best matching semantic part for each facade item.
 4. Rendering uses the normalized dimensions, anchor, and correction metadata. Today that drives a proxy. Later it can drive real mesh loading with the same contract.
 
@@ -19,7 +19,8 @@ Each part record should provide:
 
 - `id`: stable identifier inside the kit
 - `role`: semantic type such as `window`, `door`, `oculus`, `cornice`
-- `variant`: human-scale distinction such as `arched-narrow`
+- `variant`: human-scale distinction such as `a-004` or `big-001`
+- `noun`, `family`, `variantCode`, optional `instance`: parsed filename structure for inventory and debugging
 - `tags`: extra matching signals such as `arched`, `classical`, `wide`
 - `dimensions`: normalized meters after source understanding
 - `anchor`: placement contract for facade attachment
@@ -38,11 +39,11 @@ All normalized parts should target this standard:
 
 This means source kits can remain inconsistent as long as their adapter records the correction needed to reach this standard.
 
-## Why A Sidecar Catalog
+## Why Build-Time Discovery
 
-This prototype runs as a static browser app. In that environment, the client cannot reliably enumerate files in a directory. Because of that, each kit needs a checked-in sidecar catalog or generated manifest that lists the export parts and their normalization metadata.
+This prototype runs as a static browser app. In that environment, the client cannot reliably enumerate files in a directory at runtime. The Venice kit therefore uses a Vite glob, which expands at build time and produces a stable file manifest the browser can consume.
 
-If we later add a build step, that step can generate the sidecar automatically from a folder scan. The runtime contract does not need to change.
+If we later need richer metadata, we can still add a checked-in sidecar override or a generated manifest. The runtime contract does not need to change.
 
 ## Next Step For Real Meshes
 

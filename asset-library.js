@@ -7,6 +7,22 @@ const ROLE_DEFAULTS = {
   balcony: { category: "addon", anchor: "opening-bottom-center", previewColor: "#91969e" },
   cornice: { category: "ornament", anchor: "span-center", previewColor: "#ccb69a" },
   band: { category: "ornament", anchor: "span-center", previewColor: "#ccb69a" },
+  arch: { category: "opening", anchor: "opening-bottom-center", previewColor: "#b09a7f" },
+  shopfront: { category: "opening", anchor: "opening-bottom-center", previewColor: "#8db5c0" },
+  profile: { category: "ornament", anchor: "span-center", previewColor: "#ccb69a" },
+  ledge: { category: "ornament", anchor: "span-center", previewColor: "#bfa685" },
+  base: { category: "structural", anchor: "span-center", previewColor: "#c9baa8" },
+  corner: { category: "structural", anchor: "span-center", previewColor: "#c9baa8" },
+  "facade-panel": { category: "panel", anchor: "span-center", previewColor: "#d6cbb6" },
+  "roof-tile": { category: "roof", anchor: "span-center", previewColor: "#8b6750" },
+  support: { category: "structural", anchor: "span-center", previewColor: "#ab9b86" },
+  chimney: { category: "roof", anchor: "span-center", previewColor: "#8c7864" },
+};
+
+const GENERIC_ROLE_DEFAULT = {
+  category: "module",
+  anchor: "span-center",
+  previewColor: "#a99b88",
 };
 
 export const ASSET_HOUSE_STANDARD = {
@@ -46,9 +62,19 @@ function inferRoleFromName(name = "") {
   const value = name.toLowerCase();
   if (value.includes("oculus")) return "oculus";
   if (value.includes("door") || value.includes("entry") || value.includes("portal")) return "door";
+  if (value.includes("shopfront")) return "shopfront";
+  if (value.includes("arch")) return "arch";
   if (value.includes("screen") || value.includes("shutter")) return "screen";
   if (value.includes("balcony")) return "balcony";
   if (value.includes("cornice")) return "cornice";
+  if (value.includes("profile")) return "profile";
+  if (value.includes("ledge")) return "ledge";
+  if (value.includes("roof") && value.includes("tile")) return "roof-tile";
+  if (value.includes("chimney")) return "chimney";
+  if (value.includes("support")) return "support";
+  if (value.includes("corner")) return "corner";
+  if (value.includes("base")) return "base";
+  if (value.includes("facade")) return "facade-panel";
   if (value.includes("band") || value.includes("belt")) return "band";
   if (value.includes("window")) return "window";
   return "window";
@@ -66,6 +92,10 @@ function inferTags(name = "") {
     value.includes("narrow") ? "narrow" : null,
     value.includes("wide") ? "wide" : null,
     value.includes("round") ? "round" : null,
+    value.includes("big") ? "big" : null,
+    value.includes("giant") ? "giant" : null,
+    value.includes("shopfront") ? "commercial" : null,
+    value.includes("roof") ? "roof" : null,
   ]);
 }
 
@@ -85,15 +115,20 @@ function inferDimensions(dimensions) {
 export function normalizePartRecord(rawPart, index = 0) {
   const sourceName = rawPart.sourceName || rawPart.fileName || rawPart.name || `part-${index + 1}`;
   const role = rawPart.role || inferRoleFromName(sourceName);
-  const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.window;
-  const tags = unique([...(rawPart.tags || []), ...inferTags(sourceName), role]);
+  const defaults = ROLE_DEFAULTS[role] || GENERIC_ROLE_DEFAULT;
+  const tags = unique([
+    ...(rawPart.tags || []),
+    ...inferTags(sourceName),
+    rawPart.noun && rawPart.noun !== role ? slugify(rawPart.noun) : null,
+    role,
+  ]);
   const correction = {
     rotate: {
-      x: rawPart.correction?.rotate?.x || 0,
-      y: rawPart.correction?.rotate?.y || 0,
-      z: rawPart.correction?.rotate?.z || 0,
+      x: rawPart.correction?.rotate?.x ?? 0,
+      y: rawPart.correction?.rotate?.y ?? 0,
+      z: rawPart.correction?.rotate?.z ?? 0,
     },
-    uniformScale: rawPart.correction?.uniformScale || 1,
+    uniformScale: rawPart.correction?.uniformScale ?? 1,
   };
 
   return {
@@ -101,8 +136,13 @@ export function normalizePartRecord(rawPart, index = 0) {
     label: rawPart.label || titleCase(sourceName),
     sourceName,
     sourcePath: rawPart.sourcePath || rawPart.modelPath || null,
+    sourceFile: rawPart.sourceFile || null,
     role,
+    noun: rawPart.noun || role,
     category: rawPart.category || defaults.category,
+    family: rawPart.family || slugify(role),
+    variantCode: rawPart.variantCode || null,
+    instance: rawPart.instance || null,
     variant: inferVariant(rawPart, tags),
     tags,
     anchor: rawPart.anchor || defaults.anchor,
@@ -136,7 +176,8 @@ export function normalizeCatalog(rawCatalog, options = {}) {
 
 export function deriveAssetQuery(item) {
   const roleMap = {
-    entry: "entry",
+    entry: "door",
+    glass: "window",
   };
   const role = item.assetQuery?.role || roleMap[item.type] || item.type;
   const tags = unique([
@@ -189,5 +230,15 @@ export function groupPartsByRole(catalog) {
   }
   return [...groups.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([role, parts]) => ({ role, parts: parts.sort((a, b) => a.variant.localeCompare(b.variant)) }));
+    .map(([role, parts]) => ({
+      role,
+      parts: parts.sort((a, b) => {
+        return (
+          a.family.localeCompare(b.family) ||
+          (a.variantCode || "").localeCompare(b.variantCode || "", undefined, { numeric: true }) ||
+          (a.instance || "").localeCompare(b.instance || "", undefined, { numeric: true }) ||
+          a.variant.localeCompare(b.variant)
+        );
+      }),
+    }));
 }

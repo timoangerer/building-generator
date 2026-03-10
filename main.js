@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ASSET_HOUSE_STANDARD, groupPartsByRole, resolveAssetPart } from "./asset-library.js";
 import {
   loadVeniceModularBuildingPartsCatalog,
@@ -288,7 +289,7 @@ for (const kit of [veniceModularBuildingPartsDescriptor]) {
 }
 
 const state = {
-  route: "workbench",
+  route: "viewer",
   plotType: plotTypeSelect.value,
   floors: Number(floorsInput.value),
   floorHeight: Number(floorHeightInput.value),
@@ -300,6 +301,8 @@ const state = {
   assetCatalog: null,
   assetCatalogStatus: "idle",
   selectedAssetPartId: null,
+  assetPreviewState: "idle",
+  assetPreviewMessage: "Select a parsed part to inspect its GLB preview.",
 };
 
 const scene = new THREE.Scene();
@@ -417,6 +420,9 @@ const materials = {
 
 let wallPickers = [];
 const assetProxyMaterials = new Map();
+const assetPreviewLoader = new GLTFLoader();
+const assetPreviewSourceCache = new Map();
+let assetPreviewRequestToken = 0;
 
 function getAssetProxyMaterial(color) {
   if (!assetProxyMaterials.has(color)) {
@@ -426,6 +432,73 @@ function getAssetProxyMaterial(color) {
     );
   }
   return assetProxyMaterials.get(color);
+}
+
+function setAssetPreviewStatus(stateName, message) {
+  state.assetPreviewState = stateName;
+  state.assetPreviewMessage = message;
+  renderAssetSelectionInfo();
+}
+
+function degreesToRadians(value) {
+  return THREE.MathUtils.degToRad(value || 0);
+}
+
+function applyAssetCorrection(node, correction) {
+  node.rotation.set(
+    degreesToRadians(correction?.rotate?.x),
+    degreesToRadians(correction?.rotate?.y),
+    degreesToRadians(correction?.rotate?.z)
+  );
+  const uniformScale = correction?.uniformScale ?? 1;
+  node.scale.setScalar(uniformScale);
+}
+
+function enableAssetShadows(node) {
+  node.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
+}
+
+async function loadAssetPreviewSource(assetPart) {
+  if (!assetPart?.sourcePath) return null;
+
+  if (!assetPreviewSourceCache.has(assetPart.id)) {
+    const sourcePromise = new Promise((resolve, reject) => {
+      assetPreviewLoader.load(
+        assetPart.sourcePath,
+        (gltf) => {
+          const root = gltf.scene || gltf.scenes?.[0] || null;
+          if (!root) {
+            reject(new Error(`GLB ${assetPart.sourceFile || assetPart.sourceName} has no scene root.`));
+            return;
+          }
+
+          enableAssetShadows(root);
+          resolve(root);
+        },
+        undefined,
+        reject
+      );
+    }).catch((error) => {
+      assetPreviewSourceCache.delete(assetPart.id);
+      throw error;
+    });
+
+    assetPreviewSourceCache.set(assetPart.id, sourcePromise);
+  }
+
+  return assetPreviewSourceCache.get(assetPart.id);
+}
+
+function buildAssetModelPreviewNode(assetPart, sourceRoot) {
+  const group = new THREE.Group();
+  const model = sourceRoot.clone(true);
+  applyAssetCorrection(model, assetPart.correction);
+  group.add(model);
+  return group;
 }
 
 function createRng(seed) {
@@ -466,8 +539,8 @@ function parseRouteTokens(value) {
 }
 
 function getCurrentRoute() {
-  const route = window.location.hash.replace(/^#/, "") || "workbench";
-  return appRoutes.has(route) ? route : "workbench";
+  const route = window.location.hash.replace(/^#/, "") || "viewer";
+  return appRoutes.has(route) ? route : "viewer";
 }
 
 function renderRoute() {
@@ -509,24 +582,30 @@ function getSelectedAssetPart() {
 function renderAssetSelectionInfo() {
   const part = getSelectedAssetPart();
   if (!part) {
-    assetSelectionInfo.textContent = "Select a normalized part to inspect its contract.";
+    assetSelectionInfo.textContent = "Select a parsed part to inspect its contract and GLB preview.";
     return;
   }
 
   assetSelectionInfo.innerHTML = [
+    `<strong>Noun:</strong> ${part.noun}`,
     `<strong>Role:</strong> ${part.role}`,
+    `<strong>Family:</strong> ${part.family}`,
+    `<strong>Variant code:</strong> ${part.variantCode || "Main"}`,
+    `<strong>Instance:</strong> ${part.instance || "Base"}`,
     `<strong>Variant:</strong> ${part.variant}`,
     `<strong>Source:</strong> ${part.sourceName}`,
+    `<strong>File:</strong> ${part.sourceFile || "Unknown"}`,
     `<strong>Anchor:</strong> ${part.anchor}`,
     `<strong>Dimensions:</strong> ${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m`,
     `<strong>Correction:</strong> rotate ${part.correction.rotate.x}/${part.correction.rotate.y}/${part.correction.rotate.z} deg, scale ${part.correction.uniformScale}`,
+    `<strong>Preview:</strong> ${state.assetPreviewMessage}`,
     `<strong>Tags:</strong> ${part.tags.join(", ")}`,
   ].join("<br>");
 }
 
 function renderAssetInventory() {
   if (!state.assetCatalog?.parts?.length) {
-    assetInventory.innerHTML = '<p class="inventory-empty">No normalized parts loaded yet.</p>';
+    assetInventory.innerHTML = '<p class="inventory-empty">No parsed source parts loaded yet.</p>';
     return;
   }
 
@@ -535,7 +614,7 @@ function renderAssetInventory() {
     .map(
       ({ role, parts }) => `
         <section class="inventory-group">
-          <h3>${role}</h3>
+          <h3>${role} <span>${parts.length}</span></h3>
           ${parts
             .map(
               (part) => `
@@ -544,9 +623,10 @@ function renderAssetInventory() {
                   type="button"
                   data-part-id="${part.id}"
                 >
-                  <strong>${part.variant}</strong>
+                  <strong>${part.label}</strong>
+                  <span>${part.sourceFile || part.sourceName}</span>
+                  <span>${part.family} / ${part.variant}</span>
                   <span>${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m</span>
-                  <span>${part.tags.join(", ")}</span>
                 </button>
               `
             )
@@ -567,7 +647,9 @@ function renderAssetKitStatus(message, stateName = "ready") {
 async function loadAssetKit(kitId) {
   state.selectedAssetKitId = kitId;
   state.assetCatalogStatus = "loading";
-  renderAssetKitStatus("Loading normalized kit catalog...", "loading");
+  state.assetPreviewState = "loading";
+  state.assetPreviewMessage = "Loading parsed inventory...";
+  renderAssetKitStatus("Loading parsed GLB inventory...", "loading");
   assetInventory.innerHTML = '<p class="inventory-empty">Loading inventory...</p>';
 
   try {
@@ -581,19 +663,21 @@ async function loadAssetKit(kitId) {
     state.selectedAssetPartId = state.assetCatalog?.parts?.[0]?.id || null;
     state.assetCatalogStatus = "ready";
     const name = state.assetCatalog?.name || "Unknown kit";
-    renderAssetKitStatus(`${name}: ${count} normalized parts loaded.`, "ready");
+    renderAssetKitStatus(`${name}: ${count} GLB parts parsed from the source folder.`, "ready");
     renderAssetInventory();
     renderAssetSelectionInfo();
-    rebuildAssetPreview();
+    void rebuildAssetPreview();
     rebuildScene();
   } catch (error) {
     state.assetCatalog = null;
     state.assetCatalogStatus = "error";
     state.selectedAssetPartId = null;
+    state.assetPreviewState = "error";
+    state.assetPreviewMessage = "Could not load the asset kit.";
     renderAssetKitStatus(error.message, "error");
     renderAssetInventory();
     renderAssetSelectionInfo();
-    rebuildAssetPreview();
+    void rebuildAssetPreview();
     rebuildScene();
   }
 }
@@ -1186,19 +1270,40 @@ function buildAssetPreviewNode(assetPart) {
   return group;
 }
 
-function rebuildAssetPreview() {
+async function rebuildAssetPreview() {
+  const requestToken = ++assetPreviewRequestToken;
   assetStage.clear();
   assetStage.position.set(0, 0, 0);
   const assetPart = getSelectedAssetPart();
   if (!assetPart) return;
 
-  const baseWidth = Math.max(assetPart.dimensions.width * 1.9, 2.4);
-  const baseDepth = Math.max(assetPart.dimensions.depth * 3.2, 2.4);
-  const pedestal = makeBox(baseWidth, 0.18, baseDepth, materials.mass);
-  pedestal.position.y = -0.09;
-  assetStage.add(pedestal);
+  let node = null;
 
-  const node = buildAssetPreviewNode(assetPart);
+  if (assetPart.sourcePath) {
+    setAssetPreviewStatus("loading", `Loading GLB ${assetPart.sourceFile || assetPart.sourceName}...`);
+
+    try {
+      const sourceRoot = await loadAssetPreviewSource(assetPart);
+      if (requestToken !== assetPreviewRequestToken) return;
+      node = buildAssetModelPreviewNode(assetPart, sourceRoot);
+      setAssetPreviewStatus("ready", `Showing the actual GLB ${assetPart.sourceFile || assetPart.sourceName}.`);
+    } catch (error) {
+      console.error(error);
+      if (requestToken !== assetPreviewRequestToken) return;
+      setAssetPreviewStatus(
+        "error",
+        `GLB load failed for ${assetPart.sourceFile || assetPart.sourceName}; showing a proxy instead.`
+      );
+    }
+  }
+
+  if (!node) {
+    node = buildAssetPreviewNode(assetPart);
+    if (!assetPart.sourcePath) {
+      setAssetPreviewStatus("idle", "No GLB path recorded; showing a proxy.");
+    }
+  }
+
   assetStage.add(node);
 
   const bbox = new THREE.Box3().setFromObject(assetStage);
@@ -1213,7 +1318,7 @@ function selectAssetPart(partId) {
   state.selectedAssetPartId = partId;
   renderAssetInventory();
   renderAssetSelectionInfo();
-  rebuildAssetPreview();
+  void rebuildAssetPreview();
 }
 
 function buildFacadeForSegment(segment, totalHeight, facade, floorHeight) {
@@ -1435,7 +1540,7 @@ function animate() {
 }
 
 if (!window.location.hash || !appRoutes.has(window.location.hash.replace(/^#/, ""))) {
-  window.location.hash = "workbench";
+  window.location.hash = "viewer";
 }
 
 refreshEditor();
