@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Procedural Building Generator</title>
+    <title>Procedural Architecture Workbench</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,121 +11,166 @@
       <aside class="sidebar">
         <div class="panel brand">
           <p class="eyebrow">Procedural Architecture Lab</p>
-          <h1>Facade-first 3D building generator</h1>
+          <h1>Architecture workbench</h1>
           <p class="intro">
-            Generate plot footprints, extrude them, then control each facade with a
-            JSON layout language that behaves like a building-aware flex/grid system.
+            One app, multiple focused tools: browse demos, edit facade rules, and inspect
+            normalized asset kits without dropping back to raw files.
           </p>
         </div>
 
-        <div class="panel">
-          <h2>Building</h2>
-          <label>
-            Plot shape
-            <select id="plotType"></select>
-          </label>
-          <label>
-            Floors
-            <input id="floors" type="range" min="2" max="12" step="1" value="5" />
-            <span id="floorsValue">5</span>
-          </label>
-          <label>
-            Floor height
-            <input id="floorHeight" type="range" min="2.8" max="5.2" step="0.1" value="3.4" />
-            <span id="floorHeightValue">3.4m</span>
-          </label>
-          <label>
-            Seed
-            <input id="seed" type="number" min="1" max="999999" step="1" value="1337" />
-          </label>
-          <div class="actions">
-            <button id="randomizeShape">Random plot</button>
-            <button id="randomizeAll">Randomize all</button>
-            <button id="regenerate" class="primary">Generate</button>
+        <nav class="panel nav-panel">
+          <a href="#workbench" data-route-link="workbench" class="nav-link">Workbench</a>
+          <a href="#viewer" data-route-link="viewer" class="nav-link">3D Viewer</a>
+          <a href="#facade" data-route-link="facade" class="nav-link">Facade Editor</a>
+          <a href="#assets" data-route-link="assets" class="nav-link">Asset Library</a>
+        </nav>
+
+        <div class="route-panel-group" data-route-panels="workbench">
+          <div class="panel">
+            <h2>Workbench</h2>
+            <p class="hint">
+              Start from a tool view instead of a file. The viewer is for general massing,
+              the facade editor is for rule authoring, and the asset library is for kit browsing.
+            </p>
           </div>
         </div>
 
-        <div class="panel">
-          <h2>Facade DSL</h2>
-          <label>
-            Edit side
-            <select id="facadeSide"></select>
-          </label>
-          <label>
-            Preset
-            <select id="facadePreset"></select>
-          </label>
-          <div class="actions">
-            <button id="loadPreset">Load preset</button>
-            <button id="applyFacade" class="primary">Apply JSON</button>
+        <div class="route-panel-group" data-route-panels="viewer facade">
+          <div class="panel">
+            <h2>Building</h2>
+            <label>
+              Plot shape
+              <select id="plotType"></select>
+            </label>
+            <label>
+              Floors
+              <input id="floors" type="range" min="2" max="12" step="1" value="5" />
+              <span id="floorsValue">5</span>
+            </label>
+            <label>
+              Floor height
+              <input id="floorHeight" type="range" min="2.8" max="5.2" step="0.1" value="3.4" />
+              <span id="floorHeightValue">3.4m</span>
+            </label>
+            <label>
+              Seed
+              <input id="seed" type="number" min="1" max="999999" step="1" value="1337" />
+            </label>
+            <div class="actions">
+              <button id="randomizeShape">Random plot</button>
+              <button id="randomizeAll">Randomize all</button>
+              <button id="regenerate" class="primary">Generate</button>
+            </div>
           </div>
-          <textarea id="facadeEditor" spellcheck="false"></textarea>
-          <p class="hint">
-            Zones consume vertical space in order. Rows then fit components across the wall
-            using width ratios, minimum widths, repeat rules, and automatic scaling.
-          </p>
         </div>
 
-        <div class="panel">
-          <h2>Selection</h2>
-          <div id="selectionInfo" class="selection-info">
-            Click a wall segment in the scene to inspect its facade assignment.
+        <div class="route-panel-group" data-route-panels="facade">
+          <div class="panel">
+            <h2>Facade DSL</h2>
+            <label>
+              Edit side
+              <select id="facadeSide"></select>
+            </label>
+            <label>
+              Preset
+              <select id="facadePreset"></select>
+            </label>
+            <div class="actions">
+              <button id="loadPreset">Load preset</button>
+              <button id="applyFacade" class="primary">Apply JSON</button>
+            </div>
+            <textarea id="facadeEditor" spellcheck="false"></textarea>
+            <p class="hint">
+              Zones consume vertical space in order. Rows then fit components across the wall
+              using width ratios, minimum widths, repeat rules, and automatic scaling.
+            </p>
           </div>
-          <div class="actions">
-            <button id="toggleFocus" disabled>Open facade focus</button>
+        </div>
+
+        <div class="route-panel-group" data-route-panels="viewer facade">
+          <div class="panel">
+            <h2>Selection</h2>
+            <div id="selectionInfo" class="selection-info">
+              Click a wall segment in the scene to inspect its facade assignment.
+            </div>
+          </div>
+        </div>
+
+        <div class="route-panel-group" data-route-panels="assets">
+          <div class="panel">
+            <h2>Asset Library</h2>
+            <label>
+              Active kit
+              <select id="assetKit"></select>
+            </label>
+            <p id="assetKitStatus" class="hint">No asset kit loaded.</p>
+            <div id="assetStandardInfo" class="selection-info"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Selected Part</h2>
+            <div id="assetSelectionInfo" class="selection-info">
+              Select a normalized part to inspect its contract.
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Inventory</h2>
+            <div id="assetInventory" class="asset-inventory"></div>
           </div>
         </div>
       </aside>
 
-      <main class="viewport">
-        <div id="viewportShell" class="viewport-shell">
+      <main class="workspace">
+        <section class="route-view route-view-home" data-route-view="workbench">
+          <div class="hero-card">
+            <p class="eyebrow">Workbench</p>
+            <h2>Choose a focused tool</h2>
+            <p class="intro">
+              Treat this repo as a growing collection of architectural experiments instead of
+              a single page. Each tool keeps one concern visible and testable.
+            </p>
+          </div>
+
+          <div class="tool-grid">
+            <a href="#viewer" class="tool-card">
+              <p class="tool-kicker">Current demo</p>
+              <h3>3D Viewer</h3>
+              <p>Inspect plot generation, massing, facade assignment, and wall selection.</p>
+            </a>
+            <a href="#facade" class="tool-card">
+              <p class="tool-kicker">Authoring</p>
+              <h3>Facade Editor</h3>
+              <p>Edit the facade DSL directly while keeping the live building preview on screen.</p>
+            </a>
+            <a href="#assets" class="tool-card">
+              <p class="tool-kicker">Kit inspection</p>
+              <h3>Asset Library</h3>
+              <p>Browse normalized parts, inspect semantic tags, and preview kit pieces visually.</p>
+            </a>
+          </div>
+        </section>
+
+        <section class="route-view route-view-scene" data-route-view="viewer facade">
           <div id="sceneMount"></div>
-          <section id="facadeFocus" class="facade-focus" aria-hidden="true">
-            <div class="focus-header">
-              <div>
-                <p class="eyebrow">Facade Focus</p>
-                <h2 id="focusTitle">Select a wall</h2>
-                <p id="focusSubtitle" class="focus-subtitle">
-                  Pick a facade to open a flat elevation preview next to the 3D scene.
-                </p>
-              </div>
-              <div class="actions">
-                <button id="alignFocusView">Align 3D view</button>
-                <button id="closeFocus">Close</button>
-              </div>
-            </div>
+          <div class="legend">
+            <span><strong>Orbit:</strong> drag</span>
+            <span><strong>Zoom:</strong> wheel</span>
+            <span><strong>Pan:</strong> right-drag</span>
+          </div>
+        </section>
 
-            <div class="focus-card">
-              <div class="focus-card-header">
-                <h3>Elevation preview</h3>
-                <span id="previewStatus" class="preview-status">Applied facade</span>
-              </div>
-              <svg
-                id="elevationPreview"
-                class="elevation-preview"
-                viewBox="0 0 1000 720"
-                preserveAspectRatio="xMidYMid meet"
-                aria-label="Flat facade preview"
-              ></svg>
-            </div>
-
-            <div class="focus-card">
-              <div class="focus-card-header">
-                <h3>Component library</h3>
-                <span class="preview-status">Type-based</span>
-              </div>
-              <div id="componentLibrary" class="component-library"></div>
-            </div>
-          </section>
-        </div>
-        <div class="legend">
-          <span><strong>Orbit:</strong> drag</span>
-          <span><strong>Zoom:</strong> wheel</span>
-          <span><strong>Pan:</strong> right-drag</span>
-        </div>
+        <section class="route-view route-view-scene" data-route-view="assets">
+          <div id="assetSceneMount"></div>
+          <div class="legend">
+            <span><strong>Orbit:</strong> drag</span>
+            <span><strong>Zoom:</strong> wheel</span>
+            <span><strong>Inspect:</strong> select a part from the inventory</span>
+          </div>
+        </section>
       </main>
     </div>
 
     <script type="module" src="./main.js"></script>
   </body>
-  </html>
+</html>

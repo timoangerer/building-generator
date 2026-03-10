@@ -1,8 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ASSET_HOUSE_STANDARD, groupPartsByRole, resolveAssetPart } from "./asset-library.js";
+import {
+  loadVeniceModularBuildingPartsCatalog,
+  veniceModularBuildingPartsDescriptor,
+} from "./asset-kits/venice-modular-building-parts.js";
 
 const plotTypes = ["square", "rectangle", "l-shape", "h-shape", "o-shape", "courtyard"];
 const facadeSides = ["north", "east", "south", "west", "inner"];
+const appRoutes = new Set(["workbench", "viewer", "facade", "assets"]);
 const facadePresets = {
   classical: {
     name: "Classical",
@@ -22,6 +28,7 @@ const facadePresets = {
                 maxWidth: 2.4,
                 frameDepth: 0.3,
                 arch: true,
+                assetQuery: { role: "door", tags: ["arched", "ground-floor"] },
               },
               {
                 type: "window",
@@ -32,6 +39,7 @@ const facadePresets = {
                 frameDepth: 0.18,
                 sill: true,
                 header: "pediment",
+                assetQuery: { role: "window", tags: ["arched", "classical"] },
               },
             ],
           },
@@ -55,6 +63,7 @@ const facadePresets = {
                 gap: 0.65,
                 sill: true,
                 header: "lintel",
+                assetQuery: { role: "window", tags: ["lintel", "wide"] },
               },
             ],
           },
@@ -74,6 +83,7 @@ const facadePresets = {
                 minWidth: 1.2,
                 maxWidth: 1.5,
                 gap: 1.3,
+                assetQuery: { role: "oculus", tags: ["round"] },
               },
             ],
           },
@@ -228,6 +238,7 @@ const defaultFacadeMap = {
 };
 
 const mount = document.querySelector("#sceneMount");
+const assetMount = document.querySelector("#assetSceneMount");
 const selectionInfo = document.querySelector("#selectionInfo");
 const plotTypeSelect = document.querySelector("#plotType");
 const floorsInput = document.querySelector("#floors");
@@ -238,16 +249,14 @@ const seedInput = document.querySelector("#seed");
 const facadeSideSelect = document.querySelector("#facadeSide");
 const facadePresetSelect = document.querySelector("#facadePreset");
 const facadeEditor = document.querySelector("#facadeEditor");
-const viewportShell = document.querySelector("#viewportShell");
-const toggleFocusButton = document.querySelector("#toggleFocus");
-const facadeFocus = document.querySelector("#facadeFocus");
-const focusTitle = document.querySelector("#focusTitle");
-const focusSubtitle = document.querySelector("#focusSubtitle");
-const previewStatus = document.querySelector("#previewStatus");
-const elevationPreview = document.querySelector("#elevationPreview");
-const componentLibrary = document.querySelector("#componentLibrary");
-const alignFocusViewButton = document.querySelector("#alignFocusView");
-const closeFocusButton = document.querySelector("#closeFocus");
+const assetKitSelect = document.querySelector("#assetKit");
+const assetKitStatus = document.querySelector("#assetKitStatus");
+const assetStandardInfo = document.querySelector("#assetStandardInfo");
+const assetSelectionInfo = document.querySelector("#assetSelectionInfo");
+const assetInventory = document.querySelector("#assetInventory");
+const routeLinks = [...document.querySelectorAll("[data-route-link]")];
+const routeViews = [...document.querySelectorAll("[data-route-view]")];
+const routePanelGroups = [...document.querySelectorAll("[data-route-panels]")];
 
 for (const type of plotTypes) {
   const option = document.createElement("option");
@@ -271,7 +280,15 @@ for (const [key, preset] of Object.entries(facadePresets)) {
   facadePresetSelect.append(option);
 }
 
+for (const kit of [veniceModularBuildingPartsDescriptor]) {
+  const option = document.createElement("option");
+  option.value = kit.id;
+  option.textContent = kit.name;
+  assetKitSelect.append(option);
+}
+
 const state = {
+  route: "workbench",
   plotType: plotTypeSelect.value,
   floors: Number(floorsInput.value),
   floorHeight: Number(floorHeightInput.value),
@@ -279,7 +296,10 @@ const state = {
   facades: structuredClone(defaultFacadeMap),
   selectedSide: facadeSideSelect.value,
   selectedSegment: null,
-  focusMode: false,
+  selectedAssetKitId: assetKitSelect.value,
+  assetCatalog: null,
+  assetCatalogStatus: "idle",
+  selectedAssetPartId: null,
 };
 
 const scene = new THREE.Scene();
@@ -299,14 +319,37 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 6, 0);
 
+const assetScene = new THREE.Scene();
+assetScene.background = new THREE.Color("#e7ddc8");
+assetScene.fog = new THREE.Fog("#e7ddc8", 18, 54);
+
+const assetCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+assetCamera.position.set(5.6, 4.2, 7.4);
+
+const assetRenderer = new THREE.WebGLRenderer({ antialias: true });
+assetRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+assetRenderer.shadowMap.enabled = true;
+assetRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+assetMount.append(assetRenderer.domElement);
+
+const assetControls = new OrbitControls(assetCamera, assetRenderer.domElement);
+assetControls.enableDamping = true;
+assetControls.target.set(0, 1.6, 0);
+
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
 const stage = new THREE.Group();
 scene.add(stage);
 
+const assetStage = new THREE.Group();
+assetScene.add(assetStage);
+
 const ambient = new THREE.HemisphereLight("#fff4dc", "#9a876f", 1.5);
 scene.add(ambient);
+
+const assetAmbient = new THREE.HemisphereLight("#fff5de", "#95836e", 1.45);
+assetScene.add(assetAmbient);
 
 const sun = new THREE.DirectionalLight("#fff7e9", 1.65);
 sun.position.set(28, 32, 16);
@@ -320,6 +363,18 @@ sun.shadow.camera.top = 45;
 sun.shadow.camera.bottom = -45;
 scene.add(sun);
 
+const assetSun = new THREE.DirectionalLight("#fff8ea", 1.5);
+assetSun.position.set(8, 12, 9);
+assetSun.castShadow = true;
+assetSun.shadow.mapSize.set(1024, 1024);
+assetSun.shadow.camera.near = 1;
+assetSun.shadow.camera.far = 40;
+assetSun.shadow.camera.left = -10;
+assetSun.shadow.camera.right = 10;
+assetSun.shadow.camera.top = 10;
+assetSun.shadow.camera.bottom = -10;
+assetScene.add(assetSun);
+
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(68, 72),
   new THREE.MeshStandardMaterial({ color: "#c8b999", roughness: 1 })
@@ -328,9 +383,21 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
+const assetGround = new THREE.Mesh(
+  new THREE.CircleGeometry(18, 48),
+  new THREE.MeshStandardMaterial({ color: "#cbbb9d", roughness: 1 })
+);
+assetGround.rotation.x = -Math.PI / 2;
+assetGround.receiveShadow = true;
+assetScene.add(assetGround);
+
 const grid = new THREE.GridHelper(90, 30, "#a17d54", "#baaa92");
 grid.position.y = 0.02;
 scene.add(grid);
+
+const assetGrid = new THREE.GridHelper(20, 20, "#a58258", "#b8ab93");
+assetGrid.position.y = 0.02;
+assetScene.add(assetGrid);
 
 const materials = {
   mass: new THREE.MeshStandardMaterial({ color: "#d9cdbb", roughness: 0.94, metalness: 0.02 }),
@@ -349,7 +416,17 @@ const materials = {
 };
 
 let wallPickers = [];
-const svgNs = "http://www.w3.org/2000/svg";
+const assetProxyMaterials = new Map();
+
+function getAssetProxyMaterial(color) {
+  if (!assetProxyMaterials.has(color)) {
+    assetProxyMaterials.set(
+      color,
+      new THREE.MeshStandardMaterial({ color, roughness: 0.76, metalness: 0.06 })
+    );
+  }
+  return assetProxyMaterials.get(color);
+}
 
 function createRng(seed) {
   let t = seed >>> 0;
@@ -369,45 +446,157 @@ function randomInt(rng, min, max) {
   return Math.floor(rng() * (max - min + 1)) + min;
 }
 
-function cloneSelectionSignature(segment) {
-  if (!segment) return null;
-  return {
-    side: segment.side,
-    isHole: segment.isHole,
-    length: segment.length,
-    center: segment.center.clone(),
-  };
-}
-
-function findMatchingSegment(wallSegments, selection) {
-  if (!selection) return null;
-  let best = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (const segment of wallSegments) {
-    if (segment.side !== selection.side || segment.isHole !== selection.isHole) continue;
-    const centerDelta = segment.center.distanceTo(selection.center);
-    const score = centerDelta * 1.5 + Math.abs(segment.length - selection.length);
-    if (score < bestScore) {
-      best = segment;
-      bestScore = score;
-    }
-  }
-
-  return best;
+function resizeRenderer(targetMount, targetCamera, targetRenderer) {
+  const { clientWidth, clientHeight } = targetMount;
+  if (!clientWidth || !clientHeight) return;
+  targetCamera.aspect = clientWidth / clientHeight;
+  targetCamera.updateProjectionMatrix();
+  targetRenderer.setSize(clientWidth, clientHeight);
 }
 
 function resize() {
-  const { clientWidth, clientHeight } = mount;
-  camera.aspect = clientWidth / clientHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(clientWidth, clientHeight);
-  if (state.focusMode && state.selectedSegment) {
-    alignCameraToSelectedSegment();
-  }
+  resizeRenderer(mount, camera, renderer);
+  resizeRenderer(assetMount, assetCamera, assetRenderer);
 }
 
 window.addEventListener("resize", resize);
+
+function parseRouteTokens(value) {
+  return (value || "").split(/\s+/).filter(Boolean);
+}
+
+function getCurrentRoute() {
+  const route = window.location.hash.replace(/^#/, "") || "workbench";
+  return appRoutes.has(route) ? route : "workbench";
+}
+
+function renderRoute() {
+  state.route = getCurrentRoute();
+
+  for (const link of routeLinks) {
+    link.dataset.active = String(link.dataset.routeLink === state.route);
+  }
+
+  for (const view of routeViews) {
+    const visible = parseRouteTokens(view.dataset.routeView).includes(state.route);
+    view.classList.toggle("is-visible", visible);
+  }
+
+  for (const group of routePanelGroups) {
+    const visible = parseRouteTokens(group.dataset.routePanels).includes(state.route);
+    group.classList.toggle("is-visible", visible);
+  }
+
+  resize();
+}
+
+function renderAssetStandardInfo() {
+  assetStandardInfo.innerHTML = [
+    `<strong>Units:</strong> ${ASSET_HOUSE_STANDARD.units}`,
+    `<strong>Axes:</strong> right ${ASSET_HOUSE_STANDARD.axes.right}, up ${ASSET_HOUSE_STANDARD.axes.up}, outward ${ASSET_HOUSE_STANDARD.axes.outward}`,
+    `<strong>Opening anchor:</strong> ${ASSET_HOUSE_STANDARD.anchors["opening-bottom-center"]}`,
+  ].join("<br>");
+}
+
+function getSelectedAssetPart() {
+  if (!state.assetCatalog?.parts?.length) return null;
+  return (
+    state.assetCatalog.parts.find((part) => part.id === state.selectedAssetPartId) ||
+    state.assetCatalog.parts[0]
+  );
+}
+
+function renderAssetSelectionInfo() {
+  const part = getSelectedAssetPart();
+  if (!part) {
+    assetSelectionInfo.textContent = "Select a normalized part to inspect its contract.";
+    return;
+  }
+
+  assetSelectionInfo.innerHTML = [
+    `<strong>Role:</strong> ${part.role}`,
+    `<strong>Variant:</strong> ${part.variant}`,
+    `<strong>Source:</strong> ${part.sourceName}`,
+    `<strong>Anchor:</strong> ${part.anchor}`,
+    `<strong>Dimensions:</strong> ${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m`,
+    `<strong>Correction:</strong> rotate ${part.correction.rotate.x}/${part.correction.rotate.y}/${part.correction.rotate.z} deg, scale ${part.correction.uniformScale}`,
+    `<strong>Tags:</strong> ${part.tags.join(", ")}`,
+  ].join("<br>");
+}
+
+function renderAssetInventory() {
+  if (!state.assetCatalog?.parts?.length) {
+    assetInventory.innerHTML = '<p class="inventory-empty">No normalized parts loaded yet.</p>';
+    return;
+  }
+
+  const selectedPart = getSelectedAssetPart();
+  const sections = groupPartsByRole(state.assetCatalog)
+    .map(
+      ({ role, parts }) => `
+        <section class="inventory-group">
+          <h3>${role}</h3>
+          ${parts
+            .map(
+              (part) => `
+                <button
+                  class="inventory-item ${selectedPart?.id === part.id ? "is-active" : ""}"
+                  type="button"
+                  data-part-id="${part.id}"
+                >
+                  <strong>${part.variant}</strong>
+                  <span>${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m</span>
+                  <span>${part.tags.join(", ")}</span>
+                </button>
+              `
+            )
+            .join("")}
+        </section>
+      `
+    )
+    .join("");
+
+  assetInventory.innerHTML = sections;
+}
+
+function renderAssetKitStatus(message, stateName = "ready") {
+  assetKitStatus.textContent = message;
+  assetKitStatus.dataset.state = stateName;
+}
+
+async function loadAssetKit(kitId) {
+  state.selectedAssetKitId = kitId;
+  state.assetCatalogStatus = "loading";
+  renderAssetKitStatus("Loading normalized kit catalog...", "loading");
+  assetInventory.innerHTML = '<p class="inventory-empty">Loading inventory...</p>';
+
+  try {
+    if (kitId === veniceModularBuildingPartsDescriptor.id) {
+      state.assetCatalog = await loadVeniceModularBuildingPartsCatalog();
+    } else {
+      state.assetCatalog = null;
+    }
+
+    const count = state.assetCatalog?.parts?.length || 0;
+    state.selectedAssetPartId = state.assetCatalog?.parts?.[0]?.id || null;
+    state.assetCatalogStatus = "ready";
+    const name = state.assetCatalog?.name || "Unknown kit";
+    renderAssetKitStatus(`${name}: ${count} normalized parts loaded.`, "ready");
+    renderAssetInventory();
+    renderAssetSelectionInfo();
+    rebuildAssetPreview();
+    rebuildScene();
+  } catch (error) {
+    state.assetCatalog = null;
+    state.assetCatalogStatus = "error";
+    state.selectedAssetPartId = null;
+    renderAssetKitStatus(error.message, "error");
+    renderAssetInventory();
+    renderAssetSelectionInfo();
+    rebuildAssetPreview();
+    rebuildScene();
+  }
+}
 
 function cellKey(x, y) {
   return `${x},${y}`;
@@ -753,7 +942,89 @@ function addHeader(group, type, width, y, depth) {
   }
 }
 
+function fitAssetPartToSlot(assetPart, slotWidth, slotHeight) {
+  const scale = Math.min(slotWidth / assetPart.dimensions.width, slotHeight / assetPart.dimensions.height);
+  return {
+    width: assetPart.dimensions.width * scale,
+    height: assetPart.dimensions.height * scale,
+    depth: Math.max(0.08, assetPart.dimensions.depth * scale),
+  };
+}
+
+function buildAssetProxyElement(item, rowHeight, floorIndex, assetPart) {
+  const group = new THREE.Group();
+  const maxHeight = Math.min(
+    rowHeight * 0.74,
+    item.type === "door" || item.type === "entry" ? rowHeight * 0.9 : rowHeight * 0.68
+  );
+  const fitted = fitAssetPartToSlot(assetPart, item.width, maxHeight);
+  const proxyMaterial = getAssetProxyMaterial(assetPart.previewColor);
+
+  if (assetPart.role === "window" || assetPart.role === "entry" || assetPart.role === "door") {
+    const frame = makeBox(fitted.width, fitted.height, fitted.depth, materials.trim);
+    frame.position.z = 0.03;
+    const body = makeBox(fitted.width * 0.78, fitted.height * 0.8, Math.max(0.06, fitted.depth * 0.42), proxyMaterial);
+    body.position.z = 0.05;
+    group.add(frame, body);
+    if (assetPart.tags.includes("arched")) {
+      const arch = new THREE.Mesh(
+        new THREE.TorusGeometry(fitted.width * 0.28, 0.06, 12, 28, Math.PI),
+        materials.trim
+      );
+      arch.rotation.z = Math.PI;
+      arch.position.set(0, fitted.height * 0.48, 0.08);
+      arch.castShadow = true;
+      group.add(arch);
+    }
+  } else if (assetPart.role === "oculus") {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(fitted.width * 0.3, 0.08, 14, 26),
+      materials.trim
+    );
+    const pane = new THREE.Mesh(
+      new THREE.CircleGeometry(fitted.width * 0.24, 28),
+      proxyMaterial
+    );
+    pane.position.z = 0.04;
+    ring.castShadow = true;
+    group.add(ring, pane);
+  } else if (assetPart.role === "screen") {
+    const panel = makeBox(fitted.width, fitted.height, fitted.depth, proxyMaterial);
+    group.add(panel);
+  } else if (assetPart.role === "balcony") {
+    const slab = makeBox(fitted.width, 0.18, Math.max(fitted.depth, 0.8), proxyMaterial);
+    slab.position.z = Math.max(fitted.depth, 0.8) / 2;
+    slab.position.y = -fitted.height * 0.4;
+    group.add(slab);
+  }
+
+  if (item.balcony && floorIndex % item.balcony.every === 0) {
+    const slab = makeBox(item.width * 0.92, 0.16, item.balcony.depth, materials.balcony);
+    slab.position.set(0, -fitted.height * 0.62, item.balcony.depth / 2 - 0.02);
+    group.add(slab);
+
+    const rail = makeBox(item.width * 0.9, item.balcony.railHeight, 0.06, materials.dark);
+    rail.position.set(0, -fitted.height * 0.18, item.balcony.depth - 0.04);
+    group.add(rail);
+
+    const sideRail = makeBox(0.05, item.balcony.railHeight, item.balcony.depth, materials.dark);
+    const left = sideRail.clone();
+    const right = sideRail.clone();
+    left.position.set(-item.width * 0.45, -fitted.height * 0.18, item.balcony.depth / 2);
+    right.position.set(item.width * 0.45, -fitted.height * 0.18, item.balcony.depth / 2);
+    group.add(left, right);
+  }
+
+  group.userData.assetPart = assetPart;
+  return group;
+}
+
 function buildFacadeElement(item, rowHeight, floorIndex) {
+  const assetPart = resolveAssetPart(state.assetCatalog, item);
+  if (assetPart) {
+    return buildAssetProxyElement(item, rowHeight, floorIndex, assetPart);
+  }
+
   const group = new THREE.Group();
   const width = item.width;
   const height = Math.min(rowHeight * 0.74, item.type === "door" || item.type === "entry" ? rowHeight * 0.9 : rowHeight * 0.68);
@@ -827,6 +1098,19 @@ function buildFacadeElement(item, rowHeight, floorIndex) {
 }
 
 function buildOrnament(type, length, size, offsetY) {
+  const assetPart = resolveAssetPart(state.assetCatalog, { type, assetQuery: { role: type } });
+  if (assetPart) {
+    const ornament = makeBox(
+      length,
+      Math.max(size, assetPart.dimensions.height),
+      Math.max(0.14, assetPart.dimensions.depth),
+      getAssetProxyMaterial(assetPart.previewColor)
+    );
+    ornament.position.set(0, offsetY, assetPart.dimensions.depth / 2);
+    ornament.userData.assetPart = assetPart;
+    return ornament;
+  }
+
   if (type === "cornice") {
     const cornice = makeBox(length, size, 0.28, materials.trim);
     cornice.position.set(0, offsetY, 0.06);
@@ -838,6 +1122,98 @@ function buildOrnament(type, length, size, offsetY) {
     return band;
   }
   return null;
+}
+
+function buildAssetPreviewNode(assetPart) {
+  const group = new THREE.Group();
+  const proxyMaterial = getAssetProxyMaterial(assetPart.previewColor);
+  const { width, height, depth } = assetPart.dimensions;
+
+  if (["window", "door", "entry", "oculus", "screen"].includes(assetPart.role)) {
+    const backing = makeBox(width * 1.6, Math.max(height * 1.5, 2.2), 0.2, materials.wall);
+    backing.position.set(0, Math.max(height * 0.2, 0.9), -0.12);
+    group.add(backing);
+  }
+
+  if (assetPart.role === "window" || assetPart.role === "door" || assetPart.role === "entry") {
+    const frame = makeBox(width, height, depth, materials.trim);
+    frame.position.y = height / 2;
+    frame.position.z = depth / 2;
+    const body = makeBox(width * 0.78, height * 0.8, Math.max(0.06, depth * 0.42), proxyMaterial);
+    body.position.y = height / 2;
+    body.position.z = depth * 0.64;
+    group.add(frame, body);
+
+    if (assetPart.tags.includes("arched")) {
+      const arch = new THREE.Mesh(
+        new THREE.TorusGeometry(width * 0.28, 0.06, 12, 28, Math.PI),
+        materials.trim
+      );
+      arch.rotation.z = Math.PI;
+      arch.position.set(0, height, depth * 0.72);
+      arch.castShadow = true;
+      group.add(arch);
+    }
+  } else if (assetPart.role === "oculus") {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(width * 0.32, 0.08, 14, 26), materials.trim);
+    ring.position.y = height * 0.7;
+    ring.position.z = depth * 0.6;
+    ring.castShadow = true;
+    const pane = new THREE.Mesh(new THREE.CircleGeometry(width * 0.24, 28), proxyMaterial);
+    pane.position.set(0, height * 0.7, depth * 0.7);
+    group.add(ring, pane);
+  } else if (assetPart.role === "screen") {
+    const panel = makeBox(width, height, depth, proxyMaterial);
+    panel.position.y = height / 2;
+    panel.position.z = depth / 2;
+    group.add(panel);
+  } else if (assetPart.role === "balcony") {
+    const slab = makeBox(width, Math.max(0.18, height * 0.16), Math.max(depth, 0.9), proxyMaterial);
+    slab.position.set(0, Math.max(0.4, height * 0.2), Math.max(depth, 0.9) / 2);
+    group.add(slab);
+  } else if (assetPart.role === "cornice" || assetPart.role === "band") {
+    const strip = makeBox(width, height, depth, proxyMaterial);
+    strip.position.y = height / 2;
+    strip.position.z = depth / 2;
+    group.add(strip);
+  } else {
+    const generic = makeBox(width, height, depth, proxyMaterial);
+    generic.position.y = height / 2;
+    generic.position.z = depth / 2;
+    group.add(generic);
+  }
+
+  return group;
+}
+
+function rebuildAssetPreview() {
+  assetStage.clear();
+  assetStage.position.set(0, 0, 0);
+  const assetPart = getSelectedAssetPart();
+  if (!assetPart) return;
+
+  const baseWidth = Math.max(assetPart.dimensions.width * 1.9, 2.4);
+  const baseDepth = Math.max(assetPart.dimensions.depth * 3.2, 2.4);
+  const pedestal = makeBox(baseWidth, 0.18, baseDepth, materials.mass);
+  pedestal.position.y = -0.09;
+  assetStage.add(pedestal);
+
+  const node = buildAssetPreviewNode(assetPart);
+  assetStage.add(node);
+
+  const bbox = new THREE.Box3().setFromObject(assetStage);
+  const center = bbox.getCenter(new THREE.Vector3());
+  const size = bbox.getSize(new THREE.Vector3());
+  assetStage.position.sub(center);
+  assetStage.position.y = Math.max(size.y / 2, 0.3);
+  assetControls.target.set(0, Math.max(size.y * 0.4, 0.9), 0);
+}
+
+function selectAssetPart(partId) {
+  state.selectedAssetPartId = partId;
+  renderAssetInventory();
+  renderAssetSelectionInfo();
+  rebuildAssetPreview();
 }
 
 function buildFacadeForSegment(segment, totalHeight, facade, floorHeight) {
@@ -877,468 +1253,6 @@ function orientObjectToSegment(object, segment) {
   object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), outward);
 }
 
-function createSvgNode(tag, attributes = {}) {
-  const node = document.createElementNS(svgNs, tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    node.setAttribute(key, String(value));
-  }
-  return node;
-}
-
-function createFacadePreviewData(segment, totalHeight, facade, floorHeight) {
-  const previewZones = [];
-  const components = new Map();
-  let cursorY = 0;
-
-  const registerComponent = (type, zoneKey) => {
-    const key = type || "unknown";
-    if (!components.has(key)) {
-      components.set(key, { type: key, count: 0, zones: new Set() });
-    }
-    const entry = components.get(key);
-    entry.count += 1;
-    if (zoneKey) entry.zones.add(zoneKey);
-  };
-
-  for (const zone of allocateZoneHeights(totalHeight, facade)) {
-    const contentWidth = Math.max(1.6, segment.length - 0.6 - (zone.inset || 0) * 2);
-    const rows = planRows(zone, contentWidth, zone.resolvedHeight, floorHeight).map((row) => {
-      const items = buildRowLayout(row, row.width).map((item) => {
-        registerComponent(item.type, zone.key);
-        if (item.balcony && row.floorIndex % item.balcony.every === 0) {
-          registerComponent("balcony", zone.key);
-        }
-        return item;
-      });
-
-      return {
-        ...row,
-        absoluteY: cursorY + row.y,
-        items,
-      };
-    });
-
-    previewZones.push({
-      key: zone.key,
-      inset: zone.inset || 0,
-      y: cursorY,
-      height: zone.resolvedHeight,
-      contentWidth,
-      rows,
-      ornaments: zone.ornaments || [],
-    });
-
-    cursorY += zone.resolvedHeight;
-  }
-
-  return {
-    totalHeight,
-    segmentLength: segment.length,
-    zones: previewZones,
-    components: [...components.values()].sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
-  };
-}
-
-function renderElevationPreview(previewData) {
-  elevationPreview.replaceChildren();
-
-  if (!previewData) {
-    const placeholder = createSvgNode("text", {
-      x: 500,
-      y: 360,
-      "text-anchor": "middle",
-      "font-size": 28,
-      "font-family": "Avenir Next, Segoe UI, sans-serif",
-      fill: "#6a5c4f",
-    });
-    placeholder.textContent = "Select a wall to preview its elevation";
-    elevationPreview.append(placeholder);
-    return;
-  }
-
-  const viewWidth = 1000;
-  const viewHeight = 720;
-  const padX = 78;
-  const padY = 42;
-  const wallWidth = viewWidth - padX * 2;
-  const wallHeight = viewHeight - padY * 2;
-  const scaleX = wallWidth / previewData.segmentLength;
-  const scaleY = wallHeight / previewData.totalHeight;
-  const centerX = viewWidth / 2;
-  const wallBottom = viewHeight - padY;
-  const wallLeft = centerX - wallWidth / 2;
-  const wallTop = padY;
-  const toX = (value) => centerX + value * scaleX;
-  const toY = (value) => wallBottom - value * scaleY;
-  const baseRect = createSvgNode("rect", {
-    x: wallLeft,
-    y: wallTop,
-    width: wallWidth,
-    height: wallHeight,
-    rx: 26,
-    fill: "#efe7d8",
-    stroke: "rgba(80, 61, 41, 0.24)",
-    "stroke-width": 2,
-  });
-  elevationPreview.append(baseRect);
-
-  for (let i = 0; i < previewData.zones.length; i += 1) {
-    const zone = previewData.zones[i];
-    const zoneTop = toY(zone.y + zone.height);
-    const zoneBottom = toY(zone.y);
-    const contentX = toX(-zone.contentWidth / 2);
-    const overlay = createSvgNode("rect", {
-      x: contentX,
-      y: zoneTop,
-      width: zone.contentWidth * scaleX,
-      height: zoneBottom - zoneTop,
-      fill: i % 2 === 0 ? "rgba(255,255,255,0.18)" : "rgba(159, 90, 43, 0.05)",
-      stroke: "rgba(80, 61, 41, 0.1)",
-      "stroke-width": 1,
-      rx: 14,
-    });
-    elevationPreview.append(overlay);
-
-    const label = createSvgNode("text", {
-      x: wallLeft + 12,
-      y: zoneTop + 22,
-      "font-size": 14,
-      "font-family": "Avenir Next, Segoe UI, sans-serif",
-      "font-weight": 600,
-      fill: "#7f4419",
-    });
-    label.textContent = zone.key;
-    elevationPreview.append(label);
-
-    const divider = createSvgNode("line", {
-      x1: wallLeft,
-      y1: zoneTop,
-      x2: wallLeft + wallWidth,
-      y2: zoneTop,
-      stroke: "rgba(80, 61, 41, 0.14)",
-      "stroke-width": 1,
-    });
-    elevationPreview.append(divider);
-
-    for (const row of zone.rows) {
-      const rowBottom = toY(row.absoluteY);
-      const rowCenterY = toY(row.absoluteY + row.resolvedHeight / 2);
-      for (const item of row.items) {
-        const itemHeight = Math.min(
-          row.resolvedHeight * 0.74,
-          item.type === "door" || item.type === "entry" ? row.resolvedHeight * 0.9 : row.resolvedHeight * 0.68
-        );
-        const frameX = toX(item.x - item.width / 2);
-        const frameY = rowCenterY - itemHeight * scaleY / 2;
-        const frameWidth = item.width * scaleX;
-        const frameHeight = itemHeight * scaleY;
-
-        const frame = createSvgNode("rect", {
-          x: frameX,
-          y: frameY,
-          width: frameWidth,
-          height: frameHeight,
-          rx: item.type === "oculus" ? frameWidth / 2 : 8,
-          fill: item.type === "door" || item.type === "entry" ? "#d0bfaa" : "#c5b097",
-          stroke: "rgba(80, 61, 41, 0.25)",
-          "stroke-width": 1.5,
-        });
-        elevationPreview.append(frame);
-
-        if (item.type === "window" || item.type === "glass") {
-          elevationPreview.append(
-            createSvgNode("rect", {
-              x: frameX + frameWidth * 0.12,
-              y: frameY + frameHeight * 0.11,
-              width: frameWidth * 0.76,
-              height: frameHeight * 0.78,
-              rx: 6,
-              fill: "#8fb0bf",
-              opacity: item.type === "glass" ? 0.95 : 0.88,
-            })
-          );
-          if (item.sill) {
-            elevationPreview.append(
-              createSvgNode("rect", {
-                x: frameX + frameWidth * 0.08,
-                y: frameY + frameHeight * 0.92,
-                width: frameWidth * 0.84,
-                height: 5,
-                rx: 3,
-                fill: "#c5b097",
-              })
-            );
-          }
-        } else if (item.type === "door" || item.type === "entry") {
-          elevationPreview.append(
-            createSvgNode("rect", {
-              x: frameX + frameWidth * 0.14,
-              y: frameY + frameHeight * 0.12,
-              width: frameWidth * 0.72,
-              height: frameHeight * 0.88,
-              rx: 6,
-              fill: "#5c5349",
-            })
-          );
-          if (item.arch) {
-            elevationPreview.append(
-              createSvgNode("path", {
-                d: `M ${frameX + frameWidth * 0.24} ${frameY + frameHeight * 0.3} A ${frameWidth * 0.26} ${
-                  frameHeight * 0.26
-                } 0 0 1 ${frameX + frameWidth * 0.76} ${frameY + frameHeight * 0.3}`,
-                fill: "none",
-                stroke: "#c5b097",
-                "stroke-width": 6,
-                "stroke-linecap": "round",
-              })
-            );
-          }
-        } else if (item.type === "oculus") {
-          elevationPreview.append(
-            createSvgNode("circle", {
-              cx: frameX + frameWidth / 2,
-              cy: frameY + frameHeight / 2,
-              r: Math.min(frameWidth, frameHeight) * 0.26,
-              fill: "#8fb0bf",
-            })
-          );
-        } else if (item.type === "screen") {
-          for (let slat = -2; slat <= 2; slat += 1) {
-            elevationPreview.append(
-              createSvgNode("rect", {
-                x: frameX + frameWidth / 2 + slat * frameWidth * 0.16 - 4,
-                y: frameY + frameHeight * 0.08,
-                width: 8,
-                height: frameHeight * 0.84,
-                rx: 3,
-                fill: "#5c5349",
-              })
-            );
-          }
-        }
-
-        if (item.header === "lintel") {
-          elevationPreview.append(
-            createSvgNode("rect", {
-              x: frameX - frameWidth * 0.05,
-              y: frameY - 8,
-              width: frameWidth * 1.1,
-              height: 8,
-              rx: 4,
-              fill: "#c5b097",
-            })
-          );
-        } else if (item.header === "pediment") {
-          elevationPreview.append(
-            createSvgNode("path", {
-              d: `M ${frameX + frameWidth * 0.08} ${frameY - 1} L ${frameX + frameWidth / 2} ${
-                frameY - 18
-              } L ${frameX + frameWidth * 0.92} ${frameY - 1} Z`,
-              fill: "#c5b097",
-            })
-          );
-        } else if (item.header === "arch") {
-          elevationPreview.append(
-            createSvgNode("path", {
-              d: `M ${frameX + frameWidth * 0.18} ${frameY + 2} A ${frameWidth * 0.32} ${frameHeight * 0.22} 0 0 1 ${
-                frameX + frameWidth * 0.82
-              } ${frameY + 2}`,
-              fill: "none",
-              stroke: "#c5b097",
-              "stroke-width": 6,
-              "stroke-linecap": "round",
-            })
-          );
-        }
-
-        if (item.balcony && row.floorIndex % item.balcony.every === 0) {
-          const slabDepth = Math.max(10, frameHeight * 0.12);
-          const slabY = rowBottom - frameHeight * 0.1;
-          elevationPreview.append(
-            createSvgNode("rect", {
-              x: frameX + frameWidth * 0.04,
-              y: slabY,
-              width: frameWidth * 0.92,
-              height: slabDepth,
-              rx: 4,
-              fill: "#8a8d92",
-            })
-          );
-          elevationPreview.append(
-            createSvgNode("rect", {
-              x: frameX + frameWidth * 0.08,
-              y: slabY - frameHeight * 0.24,
-              width: frameWidth * 0.84,
-              height: 4,
-              fill: "#5c5349",
-            })
-          );
-        }
-      }
-    }
-
-    for (const ornament of zone.ornaments) {
-      const ornamentY = toY(zone.y + ornament.offsetY);
-      elevationPreview.append(
-        createSvgNode("rect", {
-          x: wallLeft,
-          y: ornamentY - Math.max(2, ornament.size * scaleY * 0.5),
-          width: wallWidth,
-          height: Math.max(4, ornament.size * scaleY),
-          rx: 3,
-          fill: "#c5b097",
-          opacity: ornament.type === "band" ? 0.75 : 0.92,
-        })
-      );
-    }
-  }
-}
-
-function renderComponentLibrary(components) {
-  componentLibrary.replaceChildren();
-
-  if (!components.length) {
-    const empty = document.createElement("p");
-    empty.className = "focus-subtitle";
-    empty.textContent = "No facade components found in this JSON.";
-    componentLibrary.append(empty);
-    return;
-  }
-
-  for (const component of components) {
-    const card = document.createElement("article");
-    card.className = "library-card";
-
-    const thumb = document.createElement("div");
-    const thumbClass = /^(window|glass|door|entry|oculus|screen|balcony)$/.test(component.type)
-      ? component.type
-      : "unknown";
-    thumb.className = `library-thumb ${thumbClass}`;
-    if (thumbClass === "screen" || thumbClass === "unknown") {
-      const shape = document.createElement("div");
-      shape.className = "shape";
-      thumb.append(shape);
-    }
-
-    const title = document.createElement("h4");
-    title.textContent = component.type;
-
-    const meta = document.createElement("p");
-    const zoneList = [...component.zones].join(", ");
-    meta.textContent = `${component.count} instance${component.count === 1 ? "" : "s"} on this segment${
-      zoneList ? ` • ${zoneList}` : ""
-    }`;
-
-    const note = document.createElement("p");
-    note.textContent = `Preview key: "${component.type}"`;
-
-    card.append(thumb, title, meta, note);
-    componentLibrary.append(card);
-  }
-}
-
-function getPreviewFacadeState() {
-  const appliedFacade = state.facades[state.selectedSide];
-  const source = { facade: appliedFacade, mode: "applied", error: null };
-
-  if (!facadeEditor.value.trim()) {
-    return source;
-  }
-
-  try {
-    return {
-      facade: JSON.parse(facadeEditor.value),
-      mode: "editor",
-      error: null,
-    };
-  } catch (error) {
-    return {
-      facade: appliedFacade,
-      mode: "fallback",
-      error,
-    };
-  }
-}
-
-function renderFocusPanel() {
-  if (!state.selectedSegment) {
-    focusTitle.textContent = "Select a wall";
-    focusSubtitle.textContent = "Pick a facade to open a flat elevation preview next to the 3D scene.";
-    previewStatus.textContent = "Applied facade";
-    previewStatus.classList.remove("error");
-    renderElevationPreview(null);
-    renderComponentLibrary([]);
-    return;
-  }
-
-  const previewFacadeState = getPreviewFacadeState();
-  const previewData = createFacadePreviewData(
-    state.selectedSegment,
-    state.floors * state.floorHeight,
-    previewFacadeState.facade,
-    state.floorHeight
-  );
-
-  focusTitle.textContent = `${state.selectedSegment.side} facade • ${state.selectedSegment.length.toFixed(1)}m`;
-  focusSubtitle.textContent =
-    state.selectedSide === state.selectedSegment.side
-      ? `${state.selectedSegment.isHole ? "Inner" : "Outer"} wall aligned beside the 3D view.`
-      : `Previewing "${state.selectedSide}" JSON on the selected ${state.selectedSegment.side} wall.`;
-
-  if (previewFacadeState.mode === "editor") {
-    previewStatus.textContent = "Live from editor";
-    previewStatus.classList.remove("error");
-  } else if (previewFacadeState.mode === "fallback") {
-    previewStatus.textContent = `Invalid JSON, showing applied facade`;
-    previewStatus.classList.add("error");
-  } else {
-    previewStatus.textContent = "Applied facade";
-    previewStatus.classList.remove("error");
-  }
-
-  renderElevationPreview(previewData);
-  renderComponentLibrary(previewData.components);
-}
-
-function updateFocusUi() {
-  const active = state.focusMode && Boolean(state.selectedSegment);
-  viewportShell.classList.toggle("focus-active", active);
-  facadeFocus.setAttribute("aria-hidden", String(!active));
-  toggleFocusButton.disabled = !state.selectedSegment;
-  toggleFocusButton.textContent = active ? "Hide facade focus" : "Open facade focus";
-}
-
-function setFocusMode(enabled, { alignCamera = true } = {}) {
-  state.focusMode = Boolean(enabled && state.selectedSegment);
-  updateFocusUi();
-  if (!alignCamera && !state.focusMode) {
-    camera.aspect = mount.clientWidth / mount.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
-    return;
-  }
-  resize();
-}
-
-function alignCameraToSelectedSegment() {
-  if (!state.selectedSegment) return;
-
-  const totalHeight = state.floors * state.floorHeight;
-  const center = state.selectedSegment.center.clone().add(stage.position);
-  center.y = totalHeight / 2;
-
-  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-  const aspect = Math.max(0.4, mount.clientWidth / Math.max(1, mount.clientHeight));
-  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
-  const widthDistance = (state.selectedSegment.length * 0.58) / Math.tan(horizontalFov / 2);
-  const heightDistance = (totalHeight * 0.62) / Math.tan(verticalFov / 2);
-  const distance = Math.max(10, widthDistance, heightDistance);
-
-  camera.position.copy(center).addScaledVector(state.selectedSegment.normal.clone().normalize(), distance);
-  controls.target.copy(center);
-  controls.update();
-}
-
 function refreshEditor() {
   const side = state.selectedSide;
   facadeEditor.value = JSON.stringify(state.facades[side], null, 2);
@@ -1347,7 +1261,6 @@ function refreshEditor() {
 function updateSelectionInfo() {
   if (!state.selectedSegment) {
     selectionInfo.textContent = "Click a wall segment in the scene to inspect its facade assignment.";
-    toggleFocusButton.disabled = true;
     return;
   }
   selectionInfo.innerHTML = [
@@ -1355,17 +1268,14 @@ function updateSelectionInfo() {
     `<strong>Length:</strong> ${state.selectedSegment.length.toFixed(2)}m`,
     `<strong>Inner wall:</strong> ${state.selectedSegment.isHole ? "yes" : "no"}`,
   ].join("<br>");
-  toggleFocusButton.disabled = false;
 }
 
 function rebuildScene() {
-  const previousSelection = cloneSelectionSignature(state.selectedSegment);
   wallPickers = [];
   stage.clear();
 
   const rng = createRng(state.seed);
   const footprint = generateFootprint(state.plotType, rng);
-  state.selectedSegment = findMatchingSegment(footprint.wallSegments, previousSelection);
   const totalHeight = state.floors * state.floorHeight;
 
   const buildingShape = footprint.shape;
@@ -1415,21 +1325,6 @@ function rebuildScene() {
   stage.position.sub(center);
   stage.position.y = 0;
   controls.target.set(0, totalHeight * 0.45, 0);
-
-  if (state.selectedSegment) {
-    state.selectedSide = state.selectedSide || state.selectedSegment.side;
-    facadeSideSelect.value = state.selectedSide;
-  } else if (state.focusMode) {
-    state.focusMode = false;
-  }
-
-  updateSelectionInfo();
-  renderFocusPanel();
-  updateFocusUi();
-
-  if (state.focusMode && state.selectedSegment) {
-    alignCameraToSelectedSegment();
-  }
 }
 
 function applyFacadeJson() {
@@ -1485,11 +1380,16 @@ seedInput.addEventListener("change", () => {
 facadeSideSelect.addEventListener("change", () => {
   state.selectedSide = facadeSideSelect.value;
   refreshEditor();
-  renderFocusPanel();
 });
 
-facadeEditor.addEventListener("input", () => {
-  renderFocusPanel();
+assetKitSelect.addEventListener("change", () => {
+  loadAssetKit(assetKitSelect.value);
+});
+
+assetInventory.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-part-id]");
+  if (!trigger) return;
+  selectAssetPart(trigger.dataset.partId);
 });
 
 document.querySelector("#regenerate").addEventListener("click", rebuildScene);
@@ -1508,15 +1408,6 @@ document.querySelector("#applyFacade").addEventListener("click", () => {
   }
 });
 document.querySelector("#loadPreset").addEventListener("click", () => loadPreset(facadePresetSelect.value));
-toggleFocusButton.addEventListener("click", () => {
-  setFocusMode(!state.focusMode);
-});
-alignFocusViewButton.addEventListener("click", () => {
-  alignCameraToSelectedSegment();
-});
-closeFocusButton.addEventListener("click", () => {
-  setFocusMode(false, { alignCamera: false });
-});
 
 renderer.domElement.addEventListener("pointerdown", (event) => {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -1530,21 +1421,29 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
     facadeSideSelect.value = state.selectedSide;
     refreshEditor();
     updateSelectionInfo();
-    renderFocusPanel();
-    setFocusMode(true);
   }
 });
 
+window.addEventListener("hashchange", renderRoute);
+
 function animate() {
   controls.update();
+  assetControls.update();
   renderer.render(scene, camera);
+  assetRenderer.render(assetScene, assetCamera);
   requestAnimationFrame(animate);
+}
+
+if (!window.location.hash || !appRoutes.has(window.location.hash.replace(/^#/, ""))) {
+  window.location.hash = "workbench";
 }
 
 refreshEditor();
 updateSelectionInfo();
-renderFocusPanel();
-updateFocusUi();
+renderAssetStandardInfo();
+renderAssetSelectionInfo();
+renderRoute();
 resize();
 rebuildScene();
+loadAssetKit(state.selectedAssetKitId);
 animate();
