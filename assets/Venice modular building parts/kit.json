@@ -1,0 +1,81 @@
+{
+  "id": "venice-modular-building-parts",
+  "name": "Venice modular building parts",
+  "sourceRoot": "./assets/Venice modular building parts/",
+  "sourceOrientation": {
+    "right": "+X",
+    "up": "+Z",
+    "forward": "+Y"
+  },
+  "normalization": {
+    "units": "meters",
+    "axes": {
+      "right": "+X",
+      "up": "+Y",
+      "outward": "+Z"
+    }
+  },
+  "parts": [
+    {
+      "id": "venice-door-arched-main",
+      "sourceName": "Door_Arched_Main",
+      "role": "door",
+      "variant": "arched-main",
+      "tags": ["arched", "classical", "ground-floor"],
+      "dimensions": { "width": 2.2, "height": 3.4, "depth": 0.34 },
+      "correction": {
+        "rotate": { "x": -90, "y": 0, "z": 0 },
+        "uniformScale": 1
+      },
+      "notes": "Starter semantic entry. Replace source names and paths with the real export inventory."
+    },
+    {
+      "id": "venice-window-arched-narrow",
+      "sourceName": "Window_Arched_Narrow",
+      "role": "window",
+      "variant": "arched-narrow",
+      "tags": ["arched", "classical", "narrow"],
+      "dimensions": { "width": 1.45, "height": 2.4, "depth": 0.24 },
+      "correction": {
+        "rotate": { "x": -90, "y": 0, "z": 0 },
+        "uniformScale": 1
+      }
+    },
+    {
+      "id": "venice-window-lintel-wide",
+      "sourceName": "Window_Lintel_Wide",
+      "role": "window",
+      "variant": "lintel-wide",
+      "tags": ["lintel", "classical", "wide"],
+      "dimensions": { "width": 1.9, "height": 2.15, "depth": 0.24 },
+      "correction": {
+        "rotate": { "x": -90, "y": 0, "z": 0 },
+        "uniformScale": 1
+      }
+    },
+    {
+      "id": "venice-oculus-round-small",
+      "sourceName": "Oculus_Round_Small",
+      "role": "oculus",
+      "variant": "round-small",
+      "tags": ["round", "attic"],
+      "dimensions": { "width": 1.2, "height": 1.2, "depth": 0.18 },
+      "correction": {
+        "rotate": { "x": -90, "y": 0, "z": 0 },
+        "uniformScale": 1
+      }
+    },
+    {
+      "id": "venice-cornice-linear",
+      "sourceName": "Cornice_Linear",
+      "role": "cornice",
+      "variant": "linear",
+      "tags": ["trim", "classical"],
+      "dimensions": { "width": 3, "height": 0.42, "depth": 0.26 },
+      "correction": {
+        "rotate": { "x": -90, "y": 0, "z": 0 },
+        "uniformScale": 1
+      }
+    }
+  ]
+}
