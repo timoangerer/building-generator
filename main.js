@@ -1,8 +1,14 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ASSET_HOUSE_STANDARD, groupPartsByRole, resolveAssetPart } from "./asset-library.js";
+import {
+  loadVeniceModularBuildingPartsCatalog,
+  veniceModularBuildingPartsDescriptor,
+} from "./asset-kits/venice-modular-building-parts.js";
 
 const plotTypes = ["square", "rectangle", "l-shape", "h-shape", "o-shape", "courtyard"];
 const facadeSides = ["north", "east", "south", "west", "inner"];
+const appRoutes = new Set(["workbench", "viewer", "facade", "assets"]);
 const facadePresets = {
   classical: {
     name: "Classical",
@@ -22,6 +28,7 @@ const facadePresets = {
                 maxWidth: 2.4,
                 frameDepth: 0.3,
                 arch: true,
+                assetQuery: { role: "door", tags: ["arched", "ground-floor"] },
               },
               {
                 type: "window",
@@ -32,6 +39,7 @@ const facadePresets = {
                 frameDepth: 0.18,
                 sill: true,
                 header: "pediment",
+                assetQuery: { role: "window", tags: ["arched", "classical"] },
               },
             ],
           },
@@ -55,6 +63,7 @@ const facadePresets = {
                 gap: 0.65,
                 sill: true,
                 header: "lintel",
+                assetQuery: { role: "window", tags: ["lintel", "wide"] },
               },
             ],
           },
@@ -74,6 +83,7 @@ const facadePresets = {
                 minWidth: 1.2,
                 maxWidth: 1.5,
                 gap: 1.3,
+                assetQuery: { role: "oculus", tags: ["round"] },
               },
             ],
           },
@@ -228,6 +238,7 @@ const defaultFacadeMap = {
 };
 
 const mount = document.querySelector("#sceneMount");
+const assetMount = document.querySelector("#assetSceneMount");
 const selectionInfo = document.querySelector("#selectionInfo");
 const plotTypeSelect = document.querySelector("#plotType");
 const floorsInput = document.querySelector("#floors");
@@ -238,6 +249,14 @@ const seedInput = document.querySelector("#seed");
 const facadeSideSelect = document.querySelector("#facadeSide");
 const facadePresetSelect = document.querySelector("#facadePreset");
 const facadeEditor = document.querySelector("#facadeEditor");
+const assetKitSelect = document.querySelector("#assetKit");
+const assetKitStatus = document.querySelector("#assetKitStatus");
+const assetStandardInfo = document.querySelector("#assetStandardInfo");
+const assetSelectionInfo = document.querySelector("#assetSelectionInfo");
+const assetInventory = document.querySelector("#assetInventory");
+const routeLinks = [...document.querySelectorAll("[data-route-link]")];
+const routeViews = [...document.querySelectorAll("[data-route-view]")];
+const routePanelGroups = [...document.querySelectorAll("[data-route-panels]")];
 
 for (const type of plotTypes) {
   const option = document.createElement("option");
@@ -261,7 +280,15 @@ for (const [key, preset] of Object.entries(facadePresets)) {
   facadePresetSelect.append(option);
 }
 
+for (const kit of [veniceModularBuildingPartsDescriptor]) {
+  const option = document.createElement("option");
+  option.value = kit.id;
+  option.textContent = kit.name;
+  assetKitSelect.append(option);
+}
+
 const state = {
+  route: "workbench",
   plotType: plotTypeSelect.value,
   floors: Number(floorsInput.value),
   floorHeight: Number(floorHeightInput.value),
@@ -269,6 +296,10 @@ const state = {
   facades: structuredClone(defaultFacadeMap),
   selectedSide: facadeSideSelect.value,
   selectedSegment: null,
+  selectedAssetKitId: assetKitSelect.value,
+  assetCatalog: null,
+  assetCatalogStatus: "idle",
+  selectedAssetPartId: null,
 };
 
 const scene = new THREE.Scene();
@@ -288,14 +319,37 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 6, 0);
 
+const assetScene = new THREE.Scene();
+assetScene.background = new THREE.Color("#e7ddc8");
+assetScene.fog = new THREE.Fog("#e7ddc8", 18, 54);
+
+const assetCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+assetCamera.position.set(5.6, 4.2, 7.4);
+
+const assetRenderer = new THREE.WebGLRenderer({ antialias: true });
+assetRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+assetRenderer.shadowMap.enabled = true;
+assetRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+assetMount.append(assetRenderer.domElement);
+
+const assetControls = new OrbitControls(assetCamera, assetRenderer.domElement);
+assetControls.enableDamping = true;
+assetControls.target.set(0, 1.6, 0);
+
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
 const stage = new THREE.Group();
 scene.add(stage);
 
+const assetStage = new THREE.Group();
+assetScene.add(assetStage);
+
 const ambient = new THREE.HemisphereLight("#fff4dc", "#9a876f", 1.5);
 scene.add(ambient);
+
+const assetAmbient = new THREE.HemisphereLight("#fff5de", "#95836e", 1.45);
+assetScene.add(assetAmbient);
 
 const sun = new THREE.DirectionalLight("#fff7e9", 1.65);
 sun.position.set(28, 32, 16);
@@ -309,6 +363,18 @@ sun.shadow.camera.top = 45;
 sun.shadow.camera.bottom = -45;
 scene.add(sun);
 
+const assetSun = new THREE.DirectionalLight("#fff8ea", 1.5);
+assetSun.position.set(8, 12, 9);
+assetSun.castShadow = true;
+assetSun.shadow.mapSize.set(1024, 1024);
+assetSun.shadow.camera.near = 1;
+assetSun.shadow.camera.far = 40;
+assetSun.shadow.camera.left = -10;
+assetSun.shadow.camera.right = 10;
+assetSun.shadow.camera.top = 10;
+assetSun.shadow.camera.bottom = -10;
+assetScene.add(assetSun);
+
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(68, 72),
   new THREE.MeshStandardMaterial({ color: "#c8b999", roughness: 1 })
@@ -317,9 +383,21 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
+const assetGround = new THREE.Mesh(
+  new THREE.CircleGeometry(18, 48),
+  new THREE.MeshStandardMaterial({ color: "#cbbb9d", roughness: 1 })
+);
+assetGround.rotation.x = -Math.PI / 2;
+assetGround.receiveShadow = true;
+assetScene.add(assetGround);
+
 const grid = new THREE.GridHelper(90, 30, "#a17d54", "#baaa92");
 grid.position.y = 0.02;
 scene.add(grid);
+
+const assetGrid = new THREE.GridHelper(20, 20, "#a58258", "#b8ab93");
+assetGrid.position.y = 0.02;
+assetScene.add(assetGrid);
 
 const materials = {
   mass: new THREE.MeshStandardMaterial({ color: "#d9cdbb", roughness: 0.94, metalness: 0.02 }),
@@ -338,6 +416,17 @@ const materials = {
 };
 
 let wallPickers = [];
+const assetProxyMaterials = new Map();
+
+function getAssetProxyMaterial(color) {
+  if (!assetProxyMaterials.has(color)) {
+    assetProxyMaterials.set(
+      color,
+      new THREE.MeshStandardMaterial({ color, roughness: 0.76, metalness: 0.06 })
+    );
+  }
+  return assetProxyMaterials.get(color);
+}
 
 function createRng(seed) {
   let t = seed >>> 0;
@@ -357,14 +446,157 @@ function randomInt(rng, min, max) {
   return Math.floor(rng() * (max - min + 1)) + min;
 }
 
+function resizeRenderer(targetMount, targetCamera, targetRenderer) {
+  const { clientWidth, clientHeight } = targetMount;
+  if (!clientWidth || !clientHeight) return;
+  targetCamera.aspect = clientWidth / clientHeight;
+  targetCamera.updateProjectionMatrix();
+  targetRenderer.setSize(clientWidth, clientHeight);
+}
+
 function resize() {
-  const { clientWidth, clientHeight } = mount;
-  camera.aspect = clientWidth / clientHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(clientWidth, clientHeight);
+  resizeRenderer(mount, camera, renderer);
+  resizeRenderer(assetMount, assetCamera, assetRenderer);
 }
 
 window.addEventListener("resize", resize);
+
+function parseRouteTokens(value) {
+  return (value || "").split(/\s+/).filter(Boolean);
+}
+
+function getCurrentRoute() {
+  const route = window.location.hash.replace(/^#/, "") || "workbench";
+  return appRoutes.has(route) ? route : "workbench";
+}
+
+function renderRoute() {
+  state.route = getCurrentRoute();
+
+  for (const link of routeLinks) {
+    link.dataset.active = String(link.dataset.routeLink === state.route);
+  }
+
+  for (const view of routeViews) {
+    const visible = parseRouteTokens(view.dataset.routeView).includes(state.route);
+    view.classList.toggle("is-visible", visible);
+  }
+
+  for (const group of routePanelGroups) {
+    const visible = parseRouteTokens(group.dataset.routePanels).includes(state.route);
+    group.classList.toggle("is-visible", visible);
+  }
+
+  resize();
+}
+
+function renderAssetStandardInfo() {
+  assetStandardInfo.innerHTML = [
+    `<strong>Units:</strong> ${ASSET_HOUSE_STANDARD.units}`,
+    `<strong>Axes:</strong> right ${ASSET_HOUSE_STANDARD.axes.right}, up ${ASSET_HOUSE_STANDARD.axes.up}, outward ${ASSET_HOUSE_STANDARD.axes.outward}`,
+    `<strong>Opening anchor:</strong> ${ASSET_HOUSE_STANDARD.anchors["opening-bottom-center"]}`,
+  ].join("<br>");
+}
+
+function getSelectedAssetPart() {
+  if (!state.assetCatalog?.parts?.length) return null;
+  return (
+    state.assetCatalog.parts.find((part) => part.id === state.selectedAssetPartId) ||
+    state.assetCatalog.parts[0]
+  );
+}
+
+function renderAssetSelectionInfo() {
+  const part = getSelectedAssetPart();
+  if (!part) {
+    assetSelectionInfo.textContent = "Select a normalized part to inspect its contract.";
+    return;
+  }
+
+  assetSelectionInfo.innerHTML = [
+    `<strong>Role:</strong> ${part.role}`,
+    `<strong>Variant:</strong> ${part.variant}`,
+    `<strong>Source:</strong> ${part.sourceName}`,
+    `<strong>Anchor:</strong> ${part.anchor}`,
+    `<strong>Dimensions:</strong> ${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m`,
+    `<strong>Correction:</strong> rotate ${part.correction.rotate.x}/${part.correction.rotate.y}/${part.correction.rotate.z} deg, scale ${part.correction.uniformScale}`,
+    `<strong>Tags:</strong> ${part.tags.join(", ")}`,
+  ].join("<br>");
+}
+
+function renderAssetInventory() {
+  if (!state.assetCatalog?.parts?.length) {
+    assetInventory.innerHTML = '<p class="inventory-empty">No normalized parts loaded yet.</p>';
+    return;
+  }
+
+  const selectedPart = getSelectedAssetPart();
+  const sections = groupPartsByRole(state.assetCatalog)
+    .map(
+      ({ role, parts }) => `
+        <section class="inventory-group">
+          <h3>${role}</h3>
+          ${parts
+            .map(
+              (part) => `
+                <button
+                  class="inventory-item ${selectedPart?.id === part.id ? "is-active" : ""}"
+                  type="button"
+                  data-part-id="${part.id}"
+                >
+                  <strong>${part.variant}</strong>
+                  <span>${part.dimensions.width.toFixed(2)}m x ${part.dimensions.height.toFixed(2)}m x ${part.dimensions.depth.toFixed(2)}m</span>
+                  <span>${part.tags.join(", ")}</span>
+                </button>
+              `
+            )
+            .join("")}
+        </section>
+      `
+    )
+    .join("");
+
+  assetInventory.innerHTML = sections;
+}
+
+function renderAssetKitStatus(message, stateName = "ready") {
+  assetKitStatus.textContent = message;
+  assetKitStatus.dataset.state = stateName;
+}
+
+async function loadAssetKit(kitId) {
+  state.selectedAssetKitId = kitId;
+  state.assetCatalogStatus = "loading";
+  renderAssetKitStatus("Loading normalized kit catalog...", "loading");
+  assetInventory.innerHTML = '<p class="inventory-empty">Loading inventory...</p>';
+
+  try {
+    if (kitId === veniceModularBuildingPartsDescriptor.id) {
+      state.assetCatalog = await loadVeniceModularBuildingPartsCatalog();
+    } else {
+      state.assetCatalog = null;
+    }
+
+    const count = state.assetCatalog?.parts?.length || 0;
+    state.selectedAssetPartId = state.assetCatalog?.parts?.[0]?.id || null;
+    state.assetCatalogStatus = "ready";
+    const name = state.assetCatalog?.name || "Unknown kit";
+    renderAssetKitStatus(`${name}: ${count} normalized parts loaded.`, "ready");
+    renderAssetInventory();
+    renderAssetSelectionInfo();
+    rebuildAssetPreview();
+    rebuildScene();
+  } catch (error) {
+    state.assetCatalog = null;
+    state.assetCatalogStatus = "error";
+    state.selectedAssetPartId = null;
+    renderAssetKitStatus(error.message, "error");
+    renderAssetInventory();
+    renderAssetSelectionInfo();
+    rebuildAssetPreview();
+    rebuildScene();
+  }
+}
 
 function cellKey(x, y) {
   return `${x},${y}`;
@@ -710,7 +942,89 @@ function addHeader(group, type, width, y, depth) {
   }
 }
 
+function fitAssetPartToSlot(assetPart, slotWidth, slotHeight) {
+  const scale = Math.min(slotWidth / assetPart.dimensions.width, slotHeight / assetPart.dimensions.height);
+  return {
+    width: assetPart.dimensions.width * scale,
+    height: assetPart.dimensions.height * scale,
+    depth: Math.max(0.08, assetPart.dimensions.depth * scale),
+  };
+}
+
+function buildAssetProxyElement(item, rowHeight, floorIndex, assetPart) {
+  const group = new THREE.Group();
+  const maxHeight = Math.min(
+    rowHeight * 0.74,
+    item.type === "door" || item.type === "entry" ? rowHeight * 0.9 : rowHeight * 0.68
+  );
+  const fitted = fitAssetPartToSlot(assetPart, item.width, maxHeight);
+  const proxyMaterial = getAssetProxyMaterial(assetPart.previewColor);
+
+  if (assetPart.role === "window" || assetPart.role === "entry" || assetPart.role === "door") {
+    const frame = makeBox(fitted.width, fitted.height, fitted.depth, materials.trim);
+    frame.position.z = 0.03;
+    const body = makeBox(fitted.width * 0.78, fitted.height * 0.8, Math.max(0.06, fitted.depth * 0.42), proxyMaterial);
+    body.position.z = 0.05;
+    group.add(frame, body);
+    if (assetPart.tags.includes("arched")) {
+      const arch = new THREE.Mesh(
+        new THREE.TorusGeometry(fitted.width * 0.28, 0.06, 12, 28, Math.PI),
+        materials.trim
+      );
+      arch.rotation.z = Math.PI;
+      arch.position.set(0, fitted.height * 0.48, 0.08);
+      arch.castShadow = true;
+      group.add(arch);
+    }
+  } else if (assetPart.role === "oculus") {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(fitted.width * 0.3, 0.08, 14, 26),
+      materials.trim
+    );
+    const pane = new THREE.Mesh(
+      new THREE.CircleGeometry(fitted.width * 0.24, 28),
+      proxyMaterial
+    );
+    pane.position.z = 0.04;
+    ring.castShadow = true;
+    group.add(ring, pane);
+  } else if (assetPart.role === "screen") {
+    const panel = makeBox(fitted.width, fitted.height, fitted.depth, proxyMaterial);
+    group.add(panel);
+  } else if (assetPart.role === "balcony") {
+    const slab = makeBox(fitted.width, 0.18, Math.max(fitted.depth, 0.8), proxyMaterial);
+    slab.position.z = Math.max(fitted.depth, 0.8) / 2;
+    slab.position.y = -fitted.height * 0.4;
+    group.add(slab);
+  }
+
+  if (item.balcony && floorIndex % item.balcony.every === 0) {
+    const slab = makeBox(item.width * 0.92, 0.16, item.balcony.depth, materials.balcony);
+    slab.position.set(0, -fitted.height * 0.62, item.balcony.depth / 2 - 0.02);
+    group.add(slab);
+
+    const rail = makeBox(item.width * 0.9, item.balcony.railHeight, 0.06, materials.dark);
+    rail.position.set(0, -fitted.height * 0.18, item.balcony.depth - 0.04);
+    group.add(rail);
+
+    const sideRail = makeBox(0.05, item.balcony.railHeight, item.balcony.depth, materials.dark);
+    const left = sideRail.clone();
+    const right = sideRail.clone();
+    left.position.set(-item.width * 0.45, -fitted.height * 0.18, item.balcony.depth / 2);
+    right.position.set(item.width * 0.45, -fitted.height * 0.18, item.balcony.depth / 2);
+    group.add(left, right);
+  }
+
+  group.userData.assetPart = assetPart;
+  return group;
+}
+
 function buildFacadeElement(item, rowHeight, floorIndex) {
+  const assetPart = resolveAssetPart(state.assetCatalog, item);
+  if (assetPart) {
+    return buildAssetProxyElement(item, rowHeight, floorIndex, assetPart);
+  }
+
   const group = new THREE.Group();
   const width = item.width;
   const height = Math.min(rowHeight * 0.74, item.type === "door" || item.type === "entry" ? rowHeight * 0.9 : rowHeight * 0.68);
@@ -784,6 +1098,19 @@ function buildFacadeElement(item, rowHeight, floorIndex) {
 }
 
 function buildOrnament(type, length, size, offsetY) {
+  const assetPart = resolveAssetPart(state.assetCatalog, { type, assetQuery: { role: type } });
+  if (assetPart) {
+    const ornament = makeBox(
+      length,
+      Math.max(size, assetPart.dimensions.height),
+      Math.max(0.14, assetPart.dimensions.depth),
+      getAssetProxyMaterial(assetPart.previewColor)
+    );
+    ornament.position.set(0, offsetY, assetPart.dimensions.depth / 2);
+    ornament.userData.assetPart = assetPart;
+    return ornament;
+  }
+
   if (type === "cornice") {
     const cornice = makeBox(length, size, 0.28, materials.trim);
     cornice.position.set(0, offsetY, 0.06);
@@ -795,6 +1122,98 @@ function buildOrnament(type, length, size, offsetY) {
     return band;
   }
   return null;
+}
+
+function buildAssetPreviewNode(assetPart) {
+  const group = new THREE.Group();
+  const proxyMaterial = getAssetProxyMaterial(assetPart.previewColor);
+  const { width, height, depth } = assetPart.dimensions;
+
+  if (["window", "door", "entry", "oculus", "screen"].includes(assetPart.role)) {
+    const backing = makeBox(width * 1.6, Math.max(height * 1.5, 2.2), 0.2, materials.wall);
+    backing.position.set(0, Math.max(height * 0.2, 0.9), -0.12);
+    group.add(backing);
+  }
+
+  if (assetPart.role === "window" || assetPart.role === "door" || assetPart.role === "entry") {
+    const frame = makeBox(width, height, depth, materials.trim);
+    frame.position.y = height / 2;
+    frame.position.z = depth / 2;
+    const body = makeBox(width * 0.78, height * 0.8, Math.max(0.06, depth * 0.42), proxyMaterial);
+    body.position.y = height / 2;
+    body.position.z = depth * 0.64;
+    group.add(frame, body);
+
+    if (assetPart.tags.includes("arched")) {
+      const arch = new THREE.Mesh(
+        new THREE.TorusGeometry(width * 0.28, 0.06, 12, 28, Math.PI),
+        materials.trim
+      );
+      arch.rotation.z = Math.PI;
+      arch.position.set(0, height, depth * 0.72);
+      arch.castShadow = true;
+      group.add(arch);
+    }
+  } else if (assetPart.role === "oculus") {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(width * 0.32, 0.08, 14, 26), materials.trim);
+    ring.position.y = height * 0.7;
+    ring.position.z = depth * 0.6;
+    ring.castShadow = true;
+    const pane = new THREE.Mesh(new THREE.CircleGeometry(width * 0.24, 28), proxyMaterial);
+    pane.position.set(0, height * 0.7, depth * 0.7);
+    group.add(ring, pane);
+  } else if (assetPart.role === "screen") {
+    const panel = makeBox(width, height, depth, proxyMaterial);
+    panel.position.y = height / 2;
+    panel.position.z = depth / 2;
+    group.add(panel);
+  } else if (assetPart.role === "balcony") {
+    const slab = makeBox(width, Math.max(0.18, height * 0.16), Math.max(depth, 0.9), proxyMaterial);
+    slab.position.set(0, Math.max(0.4, height * 0.2), Math.max(depth, 0.9) / 2);
+    group.add(slab);
+  } else if (assetPart.role === "cornice" || assetPart.role === "band") {
+    const strip = makeBox(width, height, depth, proxyMaterial);
+    strip.position.y = height / 2;
+    strip.position.z = depth / 2;
+    group.add(strip);
+  } else {
+    const generic = makeBox(width, height, depth, proxyMaterial);
+    generic.position.y = height / 2;
+    generic.position.z = depth / 2;
+    group.add(generic);
+  }
+
+  return group;
+}
+
+function rebuildAssetPreview() {
+  assetStage.clear();
+  assetStage.position.set(0, 0, 0);
+  const assetPart = getSelectedAssetPart();
+  if (!assetPart) return;
+
+  const baseWidth = Math.max(assetPart.dimensions.width * 1.9, 2.4);
+  const baseDepth = Math.max(assetPart.dimensions.depth * 3.2, 2.4);
+  const pedestal = makeBox(baseWidth, 0.18, baseDepth, materials.mass);
+  pedestal.position.y = -0.09;
+  assetStage.add(pedestal);
+
+  const node = buildAssetPreviewNode(assetPart);
+  assetStage.add(node);
+
+  const bbox = new THREE.Box3().setFromObject(assetStage);
+  const center = bbox.getCenter(new THREE.Vector3());
+  const size = bbox.getSize(new THREE.Vector3());
+  assetStage.position.sub(center);
+  assetStage.position.y = Math.max(size.y / 2, 0.3);
+  assetControls.target.set(0, Math.max(size.y * 0.4, 0.9), 0);
+}
+
+function selectAssetPart(partId) {
+  state.selectedAssetPartId = partId;
+  renderAssetInventory();
+  renderAssetSelectionInfo();
+  rebuildAssetPreview();
 }
 
 function buildFacadeForSegment(segment, totalHeight, facade, floorHeight) {
@@ -963,6 +1382,16 @@ facadeSideSelect.addEventListener("change", () => {
   refreshEditor();
 });
 
+assetKitSelect.addEventListener("change", () => {
+  loadAssetKit(assetKitSelect.value);
+});
+
+assetInventory.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-part-id]");
+  if (!trigger) return;
+  selectAssetPart(trigger.dataset.partId);
+});
+
 document.querySelector("#regenerate").addEventListener("click", rebuildScene);
 document.querySelector("#randomizeShape").addEventListener("click", () => {
   const rng = createRng(Date.now());
@@ -995,14 +1424,26 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   }
 });
 
+window.addEventListener("hashchange", renderRoute);
+
 function animate() {
   controls.update();
+  assetControls.update();
   renderer.render(scene, camera);
+  assetRenderer.render(assetScene, assetCamera);
   requestAnimationFrame(animate);
+}
+
+if (!window.location.hash || !appRoutes.has(window.location.hash.replace(/^#/, ""))) {
+  window.location.hash = "workbench";
 }
 
 refreshEditor();
 updateSelectionInfo();
+renderAssetStandardInfo();
+renderAssetSelectionInfo();
+renderRoute();
 resize();
 rebuildScene();
+loadAssetKit(state.selectedAssetKitId);
 animate();
