@@ -10,7 +10,9 @@
     "dev": "npm run dev --workspace @green-buses/workbench",
     "build": "npm run build --workspace @green-buses/workbench",
     "preview": "npm run preview --workspace @green-buses/workbench",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "setup workspace": "node scripts/setup-workspace.mjs",
+    "work tree": "node scripts/setup-workspace.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
