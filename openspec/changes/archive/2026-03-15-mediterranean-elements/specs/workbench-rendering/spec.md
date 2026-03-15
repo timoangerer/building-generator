@@ -1,8 +1,5 @@
-# workbench-rendering Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - browser workbench rendering of generated buildings using Three.js with InstancedMesh for facade elements and per-building color variation.
-## Requirements
 ### Requirement: Facade element rendering with InstancedMesh
 The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elements with `"box"` geometry, it SHALL create a single InstancedMesh using the element's box dimensions. For elements with `"composite"` geometry, it SHALL create one InstancedMesh per unique (elementId, role) combination, where each InstancedMesh renders the geometry parts matching that role. Each instance SHALL be positioned according to the placement's position and rotationY.
 
@@ -18,13 +15,6 @@ The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elem
 - **WHEN** the workbench renders elements with "box" geometry
 - **THEN** they SHALL render as before using a single InstancedMesh per elementId
 
-### Requirement: Per-building color variation
-Each building mesh SHALL have a slightly different warm color, computed using a seeded hue shift (+/-15 degrees) from a base warm tone.
-
-#### Scenario: Buildings have distinct colors
-- **WHEN** the workbench renders multiple buildings
-- **THEN** buildings SHALL have visually distinct but harmonious warm colors
-
 ### Requirement: Element materials distinguish from walls
 Facade element meshes SHALL use material colors derived from the element catalog's `defaultPalette`, mapping each geometry part's `role` to its palette color. Parts SHALL be visually distinct from the building wall surface.
 
@@ -35,4 +25,3 @@ Facade element meshes SHALL use material colors derived from the element catalog
 #### Scenario: Elements contrast with walls
 - **WHEN** facade elements are rendered
 - **THEN** element materials SHALL use colors visually distinct from the building wall material
-

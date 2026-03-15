@@ -65,11 +65,12 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
         // Floor center Y
         const y = floor.baseY + floor.height / 2;
 
-        // World position using wall direction
+        // World position using wall direction, offset slightly along normal to avoid z-fighting
+        const normalOffset = 0.02;
         const position: Vec3 = {
-          x: wall.start.x + uNorm * dx,
+          x: wall.start.x + uNorm * dx + wall.normal.x * normalOffset,
           y,
-          z: wall.start.z + uNorm * dz,
+          z: wall.start.z + uNorm * dz + wall.normal.z * normalOffset,
         };
 
         // Ground floor center bay gets a door, everything else gets a window

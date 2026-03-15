@@ -2,8 +2,9 @@ import React, { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { runCityPipeline } from "@/orchestrator";
-import type { SceneResult, Building, ElementDefinition } from "@/contracts";
+import type { SceneResult, Building, ElementDefinition, GeometryPart, ColorPalette } from "@/contracts";
 import { createRng } from "@/utils";
 import "../index.css";
 
@@ -107,41 +108,116 @@ function buildThreeScene(
     }
   }
 
-  // Create one InstancedMesh per element type
+  // Create InstancedMesh objects for facade elements
+  const palette = elementCatalog.defaultPalette;
   const dummy = new THREE.Object3D();
+
+  function buildPartGeometry(part: GeometryPart): THREE.BufferGeometry {
+    switch (part.shape) {
+      case "box":
+        return new THREE.BoxGeometry(
+          part.dimensions.width,
+          part.dimensions.height,
+          part.dimensions.depth,
+        );
+      case "cylinder":
+        return new THREE.CylinderGeometry(
+          part.dimensions.radius,
+          part.dimensions.radius,
+          part.dimensions.height,
+          16,
+        );
+      case "half_cylinder": {
+        // Half cylinder for arch: semicircle in XY plane (curve up), depth along Z
+        // thetaStart=PI/2 puts the curved surface on +Y when viewed from front after rotation
+        const geo = new THREE.CylinderGeometry(
+          part.dimensions.radius,
+          part.dimensions.radius,
+          part.dimensions.depth,
+          16,
+          1,
+          false,
+          Math.PI / 2,
+          Math.PI,
+        );
+        // Rotate axis from Y to Z so depth goes along Z, arch profile visible from front
+        geo.rotateX(Math.PI / 2);
+        return geo;
+      }
+    }
+  }
+
+  function paletteColor(role: string): number {
+    return palette[role] ?? 0x808080;
+  }
+
   for (const [elementId, placements] of placementsByElement) {
     const elDef = elementMap.get(elementId);
     if (!elDef) continue;
 
-    const box = elDef.geometry.box;
-    const geo = new THREE.BoxGeometry(box.width, box.height, box.depth);
-
-    // Darker colors for windows (suggest depth), lighter for doors
-    let matColor: number;
-    if (elDef.type === "window") {
-      matColor = 0x1a2030; // dark blue-grey for glass
-    } else if (elDef.type === "door") {
-      matColor = 0x5a3a20; // warm brown for doors
+    if (elDef.geometry.type === "box") {
+      // Backward compatible: single InstancedMesh for box geometry
+      const box = elDef.geometry.box;
+      const geo = new THREE.BoxGeometry(box.width, box.height, box.depth);
+      let matColor: number;
+      if (elDef.type === "window") {
+        matColor = 0x1a2030;
+      } else if (elDef.type === "door") {
+        matColor = 0x5a3a20;
+      } else {
+        matColor = 0x808080;
+      }
+      const mat = new THREE.MeshToonMaterial({ color: matColor });
+      const instancedMesh = new THREE.InstancedMesh(geo, mat, placements.length);
+      for (let i = 0; i < placements.length; i++) {
+        const p = placements[i];
+        dummy.position.set(p.x, p.y, p.z);
+        dummy.rotation.set(0, p.rotationY, 0);
+        dummy.updateMatrix();
+        instancedMesh.setMatrixAt(i, dummy.matrix);
+      }
+      instancedMesh.instanceMatrix.needsUpdate = true;
+      scene.add(instancedMesh);
     } else {
-      matColor = 0x808080;
-    }
+      // Composite: one InstancedMesh per (elementId, role) with part offsets baked in
+      // Group parts by role
+      const partsByRole = new Map<string, GeometryPart[]>();
+      for (const part of elDef.geometry.parts) {
+        const list = partsByRole.get(part.role) ?? [];
+        list.push(part);
+        partsByRole.set(part.role, list);
+      }
 
-    const mat = new THREE.MeshToonMaterial({ color: matColor });
-    const instancedMesh = new THREE.InstancedMesh(
-      geo,
-      mat,
-      placements.length,
-    );
+      for (const [role, parts] of partsByRole) {
+        // Merge all parts of this role into a single BufferGeometry
+        const mergedParts: THREE.BufferGeometry[] = [];
+        for (const part of parts) {
+          const partGeo = buildPartGeometry(part);
+          partGeo.translate(part.position.x, part.position.y, part.position.z);
+          mergedParts.push(partGeo);
+        }
 
-    for (let i = 0; i < placements.length; i++) {
-      const p = placements[i];
-      dummy.position.set(p.x, p.y, p.z);
-      dummy.rotation.set(0, p.rotationY, 0);
-      dummy.updateMatrix();
-      instancedMesh.setMatrixAt(i, dummy.matrix);
+        let mergedGeo: THREE.BufferGeometry;
+        if (mergedParts.length === 1) {
+          mergedGeo = mergedParts[0];
+        } else {
+          mergedGeo = mergeGeometries(mergedParts, false) ?? mergedParts[0];
+        }
+
+        const mat = new THREE.MeshToonMaterial({ color: paletteColor(role) });
+        const instancedMesh = new THREE.InstancedMesh(mergedGeo, mat, placements.length);
+
+        for (let i = 0; i < placements.length; i++) {
+          const p = placements[i];
+          dummy.position.set(p.x, p.y, p.z);
+          dummy.rotation.set(0, p.rotationY, 0);
+          dummy.updateMatrix();
+          instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        scene.add(instancedMesh);
+      }
     }
-    instancedMesh.instanceMatrix.needsUpdate = true;
-    scene.add(instancedMesh);
   }
 
   // Streets as flat planes
