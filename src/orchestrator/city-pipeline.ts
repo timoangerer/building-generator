@@ -28,28 +28,29 @@ export function runCityPipeline(seed: number): SceneResult {
 
   const catalog = generateElementCatalog({ seed });
 
-  const allWalls = massingResult.buildings.flatMap((b) => b.walls);
-  const allFloors = massingResult.buildings[0]?.floors ?? [];
-
-  const facadeResult = generateFacade({
-    seed,
-    walls: allWalls,
-    floors: allFloors,
-    availableElements: catalog.elements,
-    bayWidth: 2.5,
-    edgeMargin: 0.5,
+  // Call generateFacade per building with each building's own walls and floors
+  const allFacades = massingResult.buildings.flatMap((building) => {
+    const facadeResult = generateFacade({
+      seed,
+      walls: building.walls,
+      floors: building.floors,
+      availableElements: catalog.elements,
+      bayWidth: 2.5,
+      edgeMargin: 0.5,
+    });
+    return facadeResult.facades;
   });
 
   const buildingResult = assembleBuildings(
     { seed },
     massingResult.buildings,
-    facadeResult.facades
+    allFacades,
   );
 
   return composeScene(
     { seed },
     buildingResult.buildings,
     plotResult.streets,
-    catalog
+    catalog,
   );
 }
