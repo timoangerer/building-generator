@@ -6,12 +6,25 @@
     "setup-workspace": "npm install && bash -lc 'set -euo pipefail; main_worktree=$(git worktree list --porcelain | sed -n \"1s/^worktree //p\"); asset_source=\"$main_worktree/assets\"; if [ ! -d \"$asset_source\" ]; then echo \"Error: assets folder not found in main worktree at $asset_source\"; exit 1; fi; if [ -L assets ]; then echo \"assets symlink already exists, pointing to $(readlink assets)\"; elif [ -e assets ]; then echo \"Error: assets already exists as a real file or directory\"; exit 1; else ln -s \"$asset_source\" assets; echo \"Symlinked assets -> $asset_source\"; fi; env_source=\"$main_worktree/.env\"; if [ -f \"$env_source\" ]; then if [ -e .env ]; then echo \".env already exists, skipping\"; else cp \"$env_source\" .env; echo \"Copied .env from $env_source\"; fi; else echo \".env not found in main worktree, skipping\"; fi'",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "three": "^0.164.1"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.164.1",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
-    "vite": "^7.1.3"
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.164.0",
+    "@vitejs/plugin-react": "^4.4.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.1.3",
+    "vitest": "^3.1.0"
   }
 }
