@@ -3,12 +3,21 @@ import { createRoot } from "react-dom/client";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { runCityPipeline } from "@/orchestrator";
-import type { SceneResult } from "@/contracts";
+import type { SceneResult, Building, ElementDefinition } from "@/contracts";
+import { createRng } from "@/utils";
 import "../index.css";
+
+function buildingColor(seed: number, buildingIndex: number): THREE.Color {
+  const rng = createRng(seed + buildingIndex * 7);
+  // Base warm tone: HSL ~30°, 50% sat, 65% lightness, with ±15° hue shift
+  const hueShift = (rng() * 2 - 1) * (15 / 360);
+  const baseHue = 30 / 360;
+  return new THREE.Color().setHSL(baseHue + hueShift, 0.5, 0.65);
+}
 
 function buildThreeScene(
   container: HTMLElement,
-  sceneResult: SceneResult
+  sceneResult: SceneResult,
 ): () => void {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
@@ -22,7 +31,7 @@ function buildThreeScene(
     50,
     container.clientWidth / container.clientHeight,
     0.1,
-    500
+    500,
   );
 
   const bounds = sceneResult.scene.sceneBounds;
@@ -43,13 +52,16 @@ function buildThreeScene(
   const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
   scene.add(ambientLight);
 
-  // Buildings as box meshes with MeshToonMaterial
-  const buildingMat = new THREE.MeshToonMaterial({ color: 0xc4956a });
+  // Buildings as box meshes with per-building color variation
+  const seed = sceneResult.config.seed;
 
-  for (const building of sceneResult.scene.buildings) {
+  for (let bi = 0; bi < sceneResult.scene.buildings.length; bi++) {
+    const building = sceneResult.scene.buildings[bi];
     const m = building.massing;
-    const bx = m.footprint.reduce((s, v) => s + v.x, 0) / m.footprint.length;
-    const bz = m.footprint.reduce((s, v) => s + v.z, 0) / m.footprint.length;
+    const bx =
+      m.footprint.reduce((s, v) => s + v.x, 0) / m.footprint.length;
+    const bz =
+      m.footprint.reduce((s, v) => s + v.z, 0) / m.footprint.length;
 
     let w = 0;
     let d = 0;
@@ -58,10 +70,78 @@ function buildThreeScene(
       d = Math.max(d, Math.abs(v.z - bz) * 2);
     }
 
+    const color = buildingColor(seed, bi);
+    const buildingMat = new THREE.MeshToonMaterial({ color });
+
     const geo = new THREE.BoxGeometry(w, m.totalHeight, d);
     const mesh = new THREE.Mesh(geo, buildingMat);
     mesh.position.set(bx, m.totalHeight / 2, bz);
     scene.add(mesh);
+  }
+
+  // Facade elements as InstancedMesh grouped by elementId
+  const elementCatalog = sceneResult.scene.elementCatalog;
+  const elementMap = new Map<string, ElementDefinition>();
+  for (const el of elementCatalog.elements) {
+    elementMap.set(el.elementId, el);
+  }
+
+  // Collect all placements grouped by elementId
+  const placementsByElement = new Map<
+    string,
+    { x: number; y: number; z: number; rotationY: number }[]
+  >();
+
+  for (const building of sceneResult.scene.buildings) {
+    for (const facade of building.facades) {
+      for (const placement of facade.placements) {
+        const list = placementsByElement.get(placement.elementId) ?? [];
+        list.push({
+          x: placement.position.x,
+          y: placement.position.y,
+          z: placement.position.z,
+          rotationY: placement.rotationY,
+        });
+        placementsByElement.set(placement.elementId, list);
+      }
+    }
+  }
+
+  // Create one InstancedMesh per element type
+  const dummy = new THREE.Object3D();
+  for (const [elementId, placements] of placementsByElement) {
+    const elDef = elementMap.get(elementId);
+    if (!elDef) continue;
+
+    const box = elDef.geometry.box;
+    const geo = new THREE.BoxGeometry(box.width, box.height, box.depth);
+
+    // Darker colors for windows (suggest depth), lighter for doors
+    let matColor: number;
+    if (elDef.type === "window") {
+      matColor = 0x1a2030; // dark blue-grey for glass
+    } else if (elDef.type === "door") {
+      matColor = 0x5a3a20; // warm brown for doors
+    } else {
+      matColor = 0x808080;
+    }
+
+    const mat = new THREE.MeshToonMaterial({ color: matColor });
+    const instancedMesh = new THREE.InstancedMesh(
+      geo,
+      mat,
+      placements.length,
+    );
+
+    for (let i = 0; i < placements.length; i++) {
+      const p = placements[i];
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.rotation.set(0, p.rotationY, 0);
+      dummy.updateMatrix();
+      instancedMesh.setMatrixAt(i, dummy.matrix);
+    }
+    instancedMesh.instanceMatrix.needsUpdate = true;
+    scene.add(instancedMesh);
   }
 
   // Streets as flat planes

@@ -1,7 +1,7 @@
 import type { ElementCatalogConfig, ElementCatalog } from "@/contracts";
 
 export function generateElementCatalog(
-  config: ElementCatalogConfig
+  config: ElementCatalogConfig,
 ): ElementCatalog {
   return {
     config,
@@ -14,17 +14,17 @@ export function generateElementCatalog(
       {
         elementId: "window-large",
         type: "window",
-        geometry: { type: "box", box: { width: 1.2, height: 1.5, depth: 0.1 } },
+        geometry: { type: "box", box: { width: 1.2, height: 1.4, depth: 0.1 } },
       },
       {
         elementId: "door-standard",
         type: "door",
-        geometry: { type: "box", box: { width: 1.0, height: 2.2, depth: 0.15 } },
+        geometry: { type: "box", box: { width: 1.0, height: 2.2, depth: 0.05 } },
       },
       {
         elementId: "wall-panel",
         type: "wall_panel",
-        geometry: { type: "box", box: { width: 2.0, height: 3.0, depth: 0.2 } },
+        geometry: { type: "box", box: { width: 1.0, height: 1.0, depth: 0.02 } },
       },
     ],
   };
