@@ -1,13 +1,17 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Product: browser-first procedural building generator for stylized game environments.
+  Primary docs:
+  - docs/product-vision.md
+  - docs/architecture-principles.md
+  - docs/verification-strategy.md
+  - docs/planning-workflow.md
+  Core expectations:
+  - Keep core generation logic data-first, deterministic, and engine-portable.
+  - Prefer semantic contracts over mesh-specific logic.
+  - Expose inspectable intermediate artifacts for every major generator stage.
+  - Use docs/ for durable guidance and OpenSpec changes for active/planned work.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
