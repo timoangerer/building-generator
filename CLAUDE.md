@@ -46,6 +46,12 @@ plots -> massing -> facade decomposition -> element selection -> style assignmen
 
 Each layer should be independently improvable while integrating through stable contracts.
 
+## Linting
+
+- Run `npm run lint` before committing.
+- Violations include agent-teaching error messages — read and fix them.
+- To add a new filesystem lint rule, create a file in `scripts/lint-rules/` exporting a `check()` function that returns `{ ok, messages[] }`.
+
 ## Verification Requirements
 
 A generator change is not done when it only "looks correct" in the viewer. At minimum it must provide:

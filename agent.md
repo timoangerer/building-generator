@@ -21,6 +21,11 @@ Read this first when working in this repo.
 - `openspec/config.yaml` exists.
 - OpenSpec has not been fully initialized in this repo yet, so the full `changes/` and `specs/` structure is not present yet.
 
+## Linting
+
+- Run `npm run lint` before committing to catch workspace hygiene issues.
+- Fix any violations — error messages explain what's wrong and how to fix it.
+
 ## MCP
 
 - No repo-specific MCP servers are documented here yet.

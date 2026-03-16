@@ -8,6 +8,7 @@
     "dev:env-lab": "vite --config vite.env-lab.config.ts",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "node scripts/lint-workspace.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

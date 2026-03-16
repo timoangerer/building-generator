@@ -26,5 +26,12 @@ npm-debug.log*
 .idea/
 *.swp
 
+# Screenshots / images dumped by agents
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
 # OS
 .DS_Store
