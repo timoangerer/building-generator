@@ -46,6 +46,11 @@ plots -> massing -> facade decomposition -> element selection -> style assignmen
 
 Each layer should be independently improvable while integrating through stable contracts.
 
+## Linting
+
+- Run `npm run lint` before committing to catch workspace hygiene issues.
+- Fix any violations — error messages explain what's wrong and how to fix it.
+
 ## Verification Requirements
 
 A generator change is not done when it only "looks correct" in the viewer. At minimum it must provide:
