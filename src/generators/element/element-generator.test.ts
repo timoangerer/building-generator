@@ -1,5 +1,7 @@
+import { describe, it, expect } from "vitest";
 import { ElementCatalogSchema } from "@/contracts/element.schema";
 import { generateElementCatalog } from "./element-generator";
+import { computeElementBounds } from "./element-bounds";
 import { testGeneratorInvariants } from "@/test-utils";
 import type { ElementCatalogConfig, ElementCatalog, GeometryPart } from "@/contracts";
 
@@ -80,6 +82,35 @@ testGeneratorInvariants({
           if (!(role in r.defaultPalette)) return false;
         }
         return true;
+      },
+    },
+    {
+      name: "window-tall has realistic dimensions (~0.9w × 1.6h)",
+      check: (r) => {
+        const el = r.elements.find((e) => e.elementId === "window-tall");
+        if (!el || el.geometry.type !== "composite") return false;
+        const frame = el.geometry.parts.find((p) => p.role === "frame");
+        if (!frame || frame.shape !== "box") return false;
+        return Math.abs(frame.dimensions.width - 0.9) < 0.05 && Math.abs(frame.dimensions.height - 1.6) < 0.05;
+      },
+    },
+    {
+      name: "window-arched has realistic dimensions (~0.9w × ~2.0h total)",
+      check: (r) => {
+        const el = r.elements.find((e) => e.elementId === "window-arched");
+        if (!el) return false;
+        const bounds = computeElementBounds(el);
+        return Math.abs(bounds.width - 1.05) < 0.1 && bounds.height > 1.8 && bounds.height < 2.2;
+      },
+    },
+    {
+      name: "window-small-sq has realistic dimensions (~0.6w × 0.6h)",
+      check: (r) => {
+        const el = r.elements.find((e) => e.elementId === "window-small-sq");
+        if (!el || el.geometry.type !== "composite") return false;
+        const frame = el.geometry.parts.find((p) => p.role === "frame");
+        if (!frame || frame.shape !== "box") return false;
+        return Math.abs(frame.dimensions.width - 0.6) < 0.05 && Math.abs(frame.dimensions.height - 0.6) < 0.05;
       },
     },
   ],
