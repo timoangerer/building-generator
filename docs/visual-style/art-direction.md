@@ -143,6 +143,10 @@ Reference images are for human consumption — they help communicate intent that
 | [3D terrain editor + day/night system (Reddit)](https://www.reddit.com/r/threejs/comments/1qqhp4l/3d_terrain_editor_daynight_system_in_the_browser/) | Terrain editing and day/night cycle in the browser | Relevant for terrain/environment around buildings and lighting variation. Shows that dynamic time-of-day is feasible in Three.js. |
 | [Stylized building generation thread (@alightinastorm)](https://x.com/alightinastorm/status/2033008419443998796) | Stylized procedural building visuals | Twitter/X thread with visual reference for stylized building generation. Directly relevant to our art direction. |
 | [Trident — vibe-stack (GitHub)](https://github.com/vibe-stack/trident) | Trident game framework / toolkit | Part of the vibe-stack ecosystem. Worth watching for patterns in browser-based game tooling and rendering approaches. |
+| [Elanra Studios post (X)](https://x.com/ElanraStudios/status/1965415480669393133) | — | — |
+| [Cannon Clash (CrazyGames)](https://www.crazygames.com/game/cannon-clash-yoo) | — | — |
+| [Poki Action Games](https://poki.com/en/action) | — | — |
+| [Jelly Slider in TypeGPU (Reddit)](https://www.reddit.com/r/webgpu/comments/1otbsu5/jelly_slider_in_typegpu/) | — | — |
 
 ## Technique Notes
 
