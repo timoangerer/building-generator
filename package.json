@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:env-lab": "vite --config vite.env-lab.config.ts",
     "dev:gallery": "vite --config vite.gallery.config.ts",
+    "dev:facade-lab": "vite --config vite.facade-lab.config.ts",
+    "dev:plot-lab": "vite --config vite.plot-lab.config.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "node scripts/lint-workspace.mjs",
@@ -14,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "leva": "^0.10.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.183.2",

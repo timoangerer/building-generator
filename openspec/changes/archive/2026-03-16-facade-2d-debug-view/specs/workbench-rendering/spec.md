@@ -1,8 +1,7 @@
-# workbench-rendering Specification
+# workbench-rendering Delta Spec
 
-## Purpose
-TBD - browser workbench rendering of generated buildings using Three.js with InstancedMesh for facade elements and per-building color variation.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Facade element rendering with InstancedMesh
 The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elements with `"box"` geometry, it SHALL create a single InstancedMesh using the element's box dimensions. For elements with `"composite"` geometry, it SHALL create one InstancedMesh per unique (elementId, role) combination, where each InstancedMesh renders the geometry parts matching that role. Each instance SHALL be positioned according to the placement's position and rotationY. When a placement has an optional `scale` field set, the instance transform SHALL apply that scale before computing the matrix.
 
@@ -25,22 +24,3 @@ The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elem
 #### Scenario: Missing scale treated as identity
 - **WHEN** a placement has no `scale` field
 - **THEN** the instance transform SHALL use scale `(1, 1, 1)` (no scaling applied)
-
-### Requirement: Per-building color variation
-Each building mesh SHALL have a slightly different warm color, computed using a seeded hue shift (+/-15 degrees) from a base warm tone.
-
-#### Scenario: Buildings have distinct colors
-- **WHEN** the workbench renders multiple buildings
-- **THEN** buildings SHALL have visually distinct but harmonious warm colors
-
-### Requirement: Element materials distinguish from walls
-Facade element meshes SHALL use material colors derived from the element catalog's `defaultPalette`, mapping each geometry part's `role` to its palette color. Parts SHALL be visually distinct from the building wall surface.
-
-#### Scenario: Role colors come from palette
-- **WHEN** facade elements are rendered
-- **THEN** each geometry part's material color SHALL match the color mapped to its role in the catalog's defaultPalette
-
-#### Scenario: Elements contrast with walls
-- **WHEN** facade elements are rendered
-- **THEN** element materials SHALL use colors visually distinct from the building wall material
-
