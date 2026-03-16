@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { z } from "zod";
-
-type Invariant<T> = {
-  name: string;
-  check: (result: T) => boolean;
-};
+import type { GeneratorFixture, Invariant } from "@/test-fixtures/types";
 
 type TestGeneratorOptions<TConfig, TResult> = {
   name: string;
@@ -16,16 +12,21 @@ type TestGeneratorOptions<TConfig, TResult> = {
 };
 
 export function testGeneratorInvariants<TConfig, TResult>(
-  options: TestGeneratorOptions<TConfig, TResult>
+  options: TestGeneratorOptions<TConfig, TResult> | GeneratorFixture<TConfig, TResult>
 ) {
+  const name = options.name;
+  const generator = options.generator;
+  const schema = options.schema;
+  const configFactory = options.configFactory;
   const seeds = options.seeds ?? [1, 42, 123, 999];
+  const invariants = options.invariants;
 
-  describe(options.name, () => {
+  describe(name, () => {
     for (const seed of seeds) {
       it(`validates against schema (seed=${seed})`, () => {
-        const config = options.configFactory(seed);
-        const result = options.generator(config);
-        const parsed = options.schema.safeParse(result);
+        const config = configFactory(seed);
+        const result = generator(config);
+        const parsed = schema.safeParse(result);
         if (!parsed.success) {
           throw new Error(
             `Schema validation failed: ${JSON.stringify(parsed.error.issues, null, 2)}`
@@ -35,17 +36,17 @@ export function testGeneratorInvariants<TConfig, TResult>(
     }
 
     it("is deterministic (same seed → same output)", () => {
-      const config = options.configFactory(42);
-      const result1 = options.generator(config);
-      const result2 = options.generator(config);
+      const config = configFactory(42);
+      const result1 = generator(config);
+      const result2 = generator(config);
       expect(result1).toEqual(result2);
     });
 
-    if (options.invariants) {
-      for (const inv of options.invariants) {
+    if (invariants) {
+      for (const inv of invariants) {
         it(inv.name, () => {
-          const config = options.configFactory(42);
-          const result = options.generator(config);
+          const config = configFactory(42);
+          const result = generator(config);
           expect(inv.check(result)).toBe(true);
         });
       }
