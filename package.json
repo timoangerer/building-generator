@@ -6,6 +6,7 @@
     "setup-workspace": "npm install && bash -lc 'set -euo pipefail; main_worktree=$(git worktree list --porcelain | sed -n \"1s/^worktree //p\"); asset_source=\"$main_worktree/assets\"; if [ ! -d \"$asset_source\" ]; then echo \"Error: assets folder not found in main worktree at $asset_source\"; exit 1; fi; if [ -L assets ]; then echo \"assets symlink already exists, pointing to $(readlink assets)\"; elif [ -e assets ]; then echo \"Error: assets already exists as a real file or directory\"; exit 1; else ln -s \"$asset_source\" assets; echo \"Symlinked assets -> $asset_source\"; fi; env_source=\"$main_worktree/.env\"; if [ -f \"$env_source\" ]; then if [ -e .env ]; then echo \".env already exists, skipping\"; else cp \"$env_source\" .env; echo \"Copied .env from $env_source\"; fi; else echo \".env not found in main worktree, skipping\"; fi'",
     "dev": "vite",
     "dev:env-lab": "vite --config vite.env-lab.config.ts",
+    "dev:gallery": "vite --config vite.gallery.config.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "node scripts/lint-workspace.mjs",
