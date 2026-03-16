@@ -48,9 +48,8 @@ Each layer should be independently improvable while integrating through stable c
 
 ## Linting
 
-- Run `npm run lint` before committing.
-- Violations include agent-teaching error messages — read and fix them.
-- To add a new filesystem lint rule, create a file in `scripts/lint-rules/` exporting a `check()` function that returns `{ ok, messages[] }`.
+- Run `npm run lint` before committing to catch workspace hygiene issues.
+- Fix any violations — error messages explain what's wrong and how to fix it.
 
 ## Verification Requirements
 
