@@ -15,12 +15,20 @@ export type ElementPlacement = {
   elementId: string;
   position: Vec3;
   rotationY: number;
+  scale?: Vec3;
+};
+
+export type BayGridEntry = {
+  floorIndex: number;
+  bayIndex: number;
+  elementId: string;
 };
 
 export type WallFacade = {
   buildingId: string;
   wallIndex: number;
   placements: ElementPlacement[];
+  bayGrid?: BayGridEntry[];
 };
 
 export type FacadeResult = {

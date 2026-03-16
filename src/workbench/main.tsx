@@ -88,10 +88,8 @@ function buildThreeScene(
   }
 
   // Collect all placements grouped by elementId
-  const placementsByElement = new Map<
-    string,
-    { x: number; y: number; z: number; rotationY: number }[]
-  >();
+  type PlacementEntry = { x: number; y: number; z: number; rotationY: number; sx: number; sy: number; sz: number };
+  const placementsByElement = new Map<string, PlacementEntry[]>();
 
   for (const building of sceneResult.scene.buildings) {
     for (const facade of building.facades) {
@@ -102,6 +100,9 @@ function buildThreeScene(
           y: placement.position.y,
           z: placement.position.z,
           rotationY: placement.rotationY,
+          sx: placement.scale?.x ?? 1,
+          sy: placement.scale?.y ?? 1,
+          sz: placement.scale?.z ?? 1,
         });
         placementsByElement.set(placement.elementId, list);
       }
@@ -173,6 +174,7 @@ function buildThreeScene(
         const p = placements[i];
         dummy.position.set(p.x, p.y, p.z);
         dummy.rotation.set(0, p.rotationY, 0);
+        dummy.scale.set(p.sx, p.sy, p.sz);
         dummy.updateMatrix();
         instancedMesh.setMatrixAt(i, dummy.matrix);
       }

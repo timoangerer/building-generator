@@ -44,25 +44,25 @@ function halfCylinderPart(
 // --- Element definitions (tasks 2.2–2.4) ---
 
 function buildWindowTall(): ElementDefinition {
-  // Narrow rectangular window ~0.6w × 1.3h
+  // Rectangular window ~0.9w × 1.6h
   return {
     elementId: "window-tall",
     type: "window",
     geometry: {
       type: "composite",
       parts: [
-        boxPart("frame", 0.6, 1.3, 0.08),
-        boxPart("pane", 0.5, 1.2, 0.03, pos(0, 0, 0.04)),
-        boxPart("sill", 0.7, 0.06, 0.12, pos(0, -0.65, 0.06)),
+        boxPart("frame", 0.9, 1.6, 0.08),
+        boxPart("pane", 0.78, 1.48, 0.03, pos(0, 0, 0.04)),
+        boxPart("sill", 1.05, 0.06, 0.12, pos(0, -0.8, 0.06)),
       ],
     },
   };
 }
 
 function buildWindowArched(): ElementDefinition {
-  // Tall window with semicircular arch top
-  const paneW = 0.5;
-  const rectH = 1.0;
+  // Tall window with semicircular arch top ~0.9w × ~2.0h total
+  const paneW = 0.78;
+  const rectH = 1.55;
   const archR = paneW / 2;
   return {
     elementId: "window-arched",
@@ -70,70 +70,70 @@ function buildWindowArched(): ElementDefinition {
     geometry: {
       type: "composite",
       parts: [
-        boxPart("frame", 0.6, rectH, 0.08),
+        boxPart("frame", 0.9, rectH, 0.08),
         boxPart("pane", paneW, rectH, 0.03, pos(0, 0, 0.04)),
         halfCylinderPart("arch", archR, 0.03, pos(0, rectH / 2, 0.06)),
-        boxPart("sill", 0.7, 0.06, 0.12, pos(0, -rectH / 2, 0.06)),
+        boxPart("sill", 1.05, 0.06, 0.12, pos(0, -rectH / 2, 0.06)),
       ],
     },
   };
 }
 
 function buildWindowShuttered(): ElementDefinition {
-  // Tall window with flanking shutters and sill
-  const paneW = 0.5;
-  const paneH = 1.2;
-  const shutterW = 0.15;
+  // Tall window with flanking shutters and sill ~0.9w+shutters × 1.5h
+  const paneW = 0.78;
+  const paneH = 1.5;
+  const shutterW = 0.22;
   return {
     elementId: "window-shuttered",
     type: "window",
     geometry: {
       type: "composite",
       parts: [
-        boxPart("frame", 0.6, paneH, 0.08),
+        boxPart("frame", 0.9, paneH, 0.08),
         boxPart("pane", paneW, paneH, 0.03, pos(0, 0, 0.04)),
         boxPart("shutter", shutterW, paneH, 0.04, pos(-(paneW / 2 + shutterW / 2 + 0.02), 0, 0.04)),
         boxPart("shutter", shutterW, paneH, 0.04, pos(paneW / 2 + shutterW / 2 + 0.02, 0, 0.04)),
-        boxPart("sill", 0.8, 0.06, 0.12, pos(0, -paneH / 2, 0.06)),
+        boxPart("sill", 1.2, 0.06, 0.12, pos(0, -paneH / 2, 0.06)),
       ],
     },
   };
 }
 
 function buildWindowArchShut(): ElementDefinition {
-  // Arched window with shutters and sill
-  const paneW = 0.5;
-  const rectH = 1.0;
+  // Arched window with shutters and sill ~0.9w+shutters × ~2.0h
+  const paneW = 0.78;
+  const rectH = 1.55;
   const archR = paneW / 2;
-  const shutterW = 0.15;
+  const shutterW = 0.22;
   return {
     elementId: "window-arch-shut",
     type: "window",
     geometry: {
       type: "composite",
       parts: [
-        boxPart("frame", 0.6, rectH, 0.08),
+        boxPart("frame", 0.9, rectH, 0.08),
         boxPart("pane", paneW, rectH, 0.03, pos(0, 0, 0.04)),
         halfCylinderPart("arch", archR, 0.03, pos(0, rectH / 2, 0.06)),
         boxPart("shutter", shutterW, rectH, 0.04, pos(-(paneW / 2 + shutterW / 2 + 0.02), 0, 0.04)),
         boxPart("shutter", shutterW, rectH, 0.04, pos(paneW / 2 + shutterW / 2 + 0.02, 0, 0.04)),
-        boxPart("sill", 0.8, 0.06, 0.12, pos(0, -rectH / 2, 0.06)),
+        boxPart("sill", 1.2, 0.06, 0.12, pos(0, -rectH / 2, 0.06)),
       ],
     },
   };
 }
 
 function buildWindowSmallSq(): ElementDefinition {
-  // Small square window ~0.5w × 0.5h
+  // Small square window ~0.6w × 0.6h
   return {
     elementId: "window-small-sq",
     type: "window",
     geometry: {
       type: "composite",
       parts: [
-        boxPart("frame", 0.5, 0.5, 0.08),
-        boxPart("pane", 0.4, 0.4, 0.03, pos(0, 0, 0.04)),
-        boxPart("sill", 0.6, 0.05, 0.1, pos(0, -0.25, 0.06)),
+        boxPart("frame", 0.6, 0.6, 0.08),
+        boxPart("pane", 0.48, 0.48, 0.03, pos(0, 0, 0.04)),
+        boxPart("sill", 0.72, 0.05, 0.1, pos(0, -0.3, 0.06)),
       ],
     },
   };

@@ -16,12 +16,20 @@ export const ElementPlacementSchema = z.object({
   elementId: z.string(),
   position: Vec3Schema,
   rotationY: z.number(),
+  scale: Vec3Schema.optional(),
+});
+
+export const BayGridEntrySchema = z.object({
+  floorIndex: z.number(),
+  bayIndex: z.number(),
+  elementId: z.string(),
 });
 
 export const WallFacadeSchema = z.object({
   buildingId: z.string(),
   wallIndex: z.number(),
   placements: z.array(ElementPlacementSchema),
+  bayGrid: z.array(BayGridEntrySchema).optional(),
 });
 
 export const FacadeResultSchema = z.object({
