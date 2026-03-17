@@ -95,7 +95,11 @@ async function collectTsFiles(dir) {
     const full = resolve(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...(await collectTsFiles(full)));
-    } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+    } else if (
+      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
+      !entry.name.endsWith(".test.ts") &&
+      !entry.name.endsWith(".test.tsx")
+    ) {
       results.push(full);
     }
   }

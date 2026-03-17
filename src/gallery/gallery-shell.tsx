@@ -17,6 +17,7 @@ export function GalleryShell() {
   const [generatedConfig, setGeneratedConfig] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof getRenderer> | null>(null);
+  const resultRef = useRef<unknown>(null);
 
   const selectedFixture = selection !== null ? allFixtures[selection.fixtureIndex] : null;
   const selectedSeed = selection !== null && selectedFixture
@@ -54,10 +55,17 @@ export function GalleryShell() {
     const config = fixture.configFactory(seed);
     const result = fixture.generator(config);
 
-    const results: InvariantResult[] = fixture.invariants.map((inv) => ({
-      name: inv.name,
-      passed: inv.check(result),
-    }));
+    const schemaResult = fixture.schema.safeParse(result);
+    const results: InvariantResult[] = [
+      {
+        name: "validates against schema",
+        passed: schemaResult.success,
+      },
+      ...fixture.invariants.map((inv) => ({
+        name: inv.name,
+        passed: inv.check(result),
+      })),
+    ];
 
     setGeneratedConfig(config);
     setGeneratedResult(result);
@@ -79,6 +87,7 @@ export function GalleryShell() {
     if (!selection || !viewportRef.current || !selectedFixture || selectedSeed === null) return;
 
     const result = runFixture(selectedFixture, selectedSeed);
+    resultRef.current = result;
 
     if (rendererRef.current) {
       rendererRef.current.dispose();
@@ -100,10 +109,10 @@ export function GalleryShell() {
   }, [selection, selectedFixture, selectedSeed, runFixture]);
 
   useEffect(() => {
-    if (rendererRef.current && generatedResult) {
-      rendererRef.current.update(generatedResult, renderOptions);
+    if (rendererRef.current && resultRef.current) {
+      rendererRef.current.update(resultRef.current, renderOptions);
     }
-  }, [renderOptions, generatedResult]);
+  }, [renderOptions]);
 
   const handleSeedStep = (delta: number) => {
     if (!selection || !selectedFixture) return;
@@ -132,6 +141,7 @@ export function GalleryShell() {
               return (
                 <button
                   key={seed}
+                  data-testid={`seed-${fixture.stage}-${seed}`}
                   className={`w-full text-left px-4 py-1.5 text-sm ${
                     isSelected
                       ? "bg-zinc-800 text-zinc-100"
@@ -153,9 +163,9 @@ export function GalleryShell() {
         <div className="flex-1 flex min-h-0">
           <div className="flex-1 relative min-w-0">
             <Leva collapsed={false} titleBar={{ title: "Gallery" }} />
-            <div ref={viewportRef} className="absolute inset-0" />
+            <div ref={viewportRef} className="absolute inset-0" data-testid="gallery-viewport" />
             {!selection && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+              <div className="absolute inset-0 flex items-center justify-center text-zinc-600" data-testid="gallery-empty">
                 Select a fixture from the sidebar
               </div>
             )}
@@ -169,7 +179,7 @@ export function GalleryShell() {
                   <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
                     Invariants
                   </span>
-                  <span className={`text-xs font-medium ${
+                  <span data-testid="gallery-invariants" className={`text-xs font-medium ${
                     passedCount === invariantResults.length ? "text-green-400" : "text-red-400"
                   }`}>
                     {passedCount}/{invariantResults.length} passed
