@@ -1,7 +1,7 @@
 # generation-utilities Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+Shared pure utility functions for the generation pipeline: seeded PRNG, Vec2 math operations, and wall-local to world-space coordinate conversion.
 ## Requirements
 ### Requirement: Seeded PRNG
 The system SHALL provide a `createRng(seed: number): () => number` function that returns a deterministic pseudo-random number generator. Each call to the returned function SHALL produce a number in the range [0, 1). The same seed SHALL always produce the same sequence of values.

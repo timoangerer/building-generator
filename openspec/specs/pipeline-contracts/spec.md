@@ -1,7 +1,7 @@
 # pipeline-contracts Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+Shared TypeScript types and Zod schemas defining the data contracts between pipeline stages: PlotResult, MassingResult, FacadeResult, ElementCatalog, BuildingResult, and SceneResult.
 ## Requirements
 ### Requirement: Base geometric primitives
 The system SHALL define shared geometric types: `Vec2` (with fields `x` and `z` for the XZ ground plane), `Vec3` (with fields `x`, `y`, `z`), `Polygon2D` (array of `Vec2`, CCW order, no duplicate closing vertex, minimum 3 vertices), and `AABB2` (with `min` and `max` Vec2 fields).

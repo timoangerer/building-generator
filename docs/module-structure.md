@@ -10,15 +10,16 @@ The project is a single TypeScript package with directory-based module boundarie
 
 ```
 src/
-├── contracts/              # shared types and interfaces — zero runtime logic
-│   ├── plot.ts
-│   ├── massing.ts
-│   ├── facade.ts
-│   ├── element.ts
-│   ├── building.ts
-│   ├── scene.ts
+├── contracts/              # shared types, interfaces, and Zod schemas — zero runtime logic
+│   ├── base.ts / base.schema.ts
+│   ├── plot.ts / plot.schema.ts
+│   ├── massing.ts / massing.schema.ts
+│   ├── element.ts / element.schema.ts
+│   ├── facade.ts / facade.schema.ts
+│   ├── building.ts / building.schema.ts
+│   ├── scene.ts / scene.schema.ts
 │   ├── asset.ts
-│   ├── artifact-meta.ts    # ArtifactMeta type for the artifact store
+│   ├── artifact-meta.ts
 │   └── index.ts
 │
 ├── utils/                  # pure helpers: seeding, math, random
@@ -26,14 +27,9 @@ src/
 │   ├── math.ts
 │   └── index.ts
 │
-├── core-geometry/          # 2D polygon ops, splitting, area — no rendering
-│   ├── polygon.ts
-│   ├── extrude.ts
-│   └── index.ts
-│
-├── asset-library/          # asset registry and resolution logic
-│   ├── registry.ts
-│   ├── resolver.ts
+├── core-geometry/          # renderer-agnostic geometry ops and bounds
+│   ├── wall-utils.ts
+│   ├── element-bounds.ts   # ElementBounds type + computeElementBounds()
 │   └── index.ts
 │
 ├── generators/             # pipeline stages — pure data in, data out
@@ -44,7 +40,7 @@ src/
 │   │   ├── massing-generator.ts
 │   │   └── index.ts
 │   ├── facade/
-│   │   ├── facade-grammar.ts
+│   │   ├── facade-generator.ts
 │   │   └── index.ts
 │   ├── element/
 │   │   ├── element-generator.ts
@@ -57,18 +53,52 @@ src/
 │   ├── city-pipeline.ts
 │   └── index.ts
 │
-└── workbench/              # browser-only: Three.js, UI, viewers
-    ├── viewers/
-    │   ├── plot-viewer.ts
-    │   ├── massing-viewer.ts
-    │   ├── facade-viewer.ts
-    │   ├── building-viewer.ts
-    │   └── scene-viewer.ts
-    ├── controls/
-    ├── debug/
-    ├── renderer.ts
-    └── main.ts             # app entry point
+├── rendering/              # shared Three.js utilities used by viewers
+│   ├── shared.ts           # buildPartGeometry(), buildingBaseColor()
+│   └── index.ts
+│
+├── workbench/              # original single-entry Three.js scene viewer
+│   ├── index.html
+│   └── main.tsx
+│
+├── gallery/                # multi-stage visual test gallery
+│   ├── index.html
+│   ├── main.tsx
+│   └── renderers/          # per-stage renderers (scene, element, facade, etc.)
+│
+├── env-lab/                # environment/atmosphere lab viewer
+│   ├── index.html
+│   └── viewer/main.tsx
+│
+├── facade-lab/             # facade decomposition debug viewer (2D canvas)
+│   ├── index.html
+│   └── viewer/main.tsx
+│
+├── plot-lab/               # plot generator debug viewer
+│   ├── index.html
+│   └── viewer/main.tsx
+│
+├── test-fixtures/          # test data factories for generators
+│   ├── types.ts
+│   ├── *-fixtures.ts
+│   └── index.ts
+│
+└── test-utils/             # test helpers (geometry checks, generator test factory)
+    ├── geometry-checks.ts
+    ├── generator-test-factory.ts
+    └── index.ts
 ```
+
+Additional top-level directories:
+
+```
+experiments/                # standalone demos and experiments
+└── water-clone/            # water shader clone from Cannon Clash
+```
+
+## Vite Configuration
+
+A single `vite.config.ts` at the project root serves all entry points via multi-page `build.rollupOptions.input`. HTML files live inside their module directories (`src/workbench/index.html`, `src/gallery/index.html`, etc.). Dev scripts use `vite --open /src/<module>/index.html` to open specific pages.
 
 ## Dependency Rules
 
@@ -78,24 +108,28 @@ Import direction is strictly downward. The layers from bottom to top:
 contracts          ← no dependencies
 utils              ← contracts
 core-geometry      ← contracts, utils
-asset-library      ← contracts, utils
-generators/*       ← contracts, utils, core-geometry, asset-library
+generators/*       ← contracts, utils, core-geometry
 orchestrator       ← contracts, generators
+rendering          ← contracts, utils, three.js
 workbench          ← anything
+gallery            ← anything
+env-lab            ← anything
+facade-lab         ← anything
+plot-lab           ← anything
 ```
 
 ### Key constraints
 
 - **Generators never import each other.** A facade generator does not import the massing generator. It receives a `MassingResult` as data. The orchestrator or test harness is responsible for wiring stages together.
-- **Three.js scene, camera, renderer, and material APIs are quarantined to `workbench/`.** Nothing outside `workbench/` should import from Three.js rendering surface. (Future consideration: when element-generator needs procedural mesh creation, a dedicated `mesh-ops/` module may wrap Three.js geometry utilities like BufferGeometry and CSG. That module would still not touch scenes, cameras, or materials.)
+- **Three.js is quarantined to rendering/viewer modules.** Only `rendering/`, `workbench/`, `gallery/`, `env-lab/`, `facade-lab/`, and `plot-lab/` may import from Three.js. Nothing in `generators/`, `contracts/`, `utils/`, `core-geometry/`, or `orchestrator/` should touch Three.js.
 - **Each module's `index.ts` is its public API.** Do not reach into another module's internal files. If something needs to be public, re-export it from the module's index.
-- **`contracts/` has zero runtime code.** Types, interfaces, and enums only.
+- **`contracts/` has zero runtime code.** Types, interfaces, Zod schemas, and enums only.
 
 ## Naming Conventions
 
 - **Directories** use kebab-case: `core-geometry/`, `asset-library/`, `plot-generator.ts`.
 - **Types and interfaces** use PascalCase: `PlotResult`, `MassingConfig`, `FacadeLayout`.
-- **Functions** use camelCase: `generatePlot()`, `resolveFacade()`, `assembleBuiding()`.
+- **Functions** use camelCase: `generatePlot()`, `resolveFacade()`, `assembleBuilding()`.
 - **Contract types** are named `{Stage}Config` for inputs and `{Stage}Result` for outputs: `PlotConfig` / `PlotResult`, `MassingConfig` / `MassingResult`.
 - **Generator entry functions** are named `generate{Stage}`: `generatePlot()`, `generateMassing()`.
 
@@ -111,11 +145,15 @@ When a type is part of the handoff between pipeline stages or is referenced by b
 
 ### Extract to `core-geometry/`
 
-When geometry logic (polygon intersection, offsetting, subdivision) is needed by more than one generator.
+When geometry logic (polygon intersection, offsetting, bounds computation) is needed by more than one generator or by both generators and viewers.
+
+### Extract to `rendering/`
+
+When Three.js rendering utilities (geometry construction, color computation) are needed by more than one viewer module.
 
 ### Keep inside the module
 
-When a helper is specific to one generator's internal logic. A private function used only by facade-grammar stays in `generators/facade/`. Do not prematurely share it.
+When a helper is specific to one generator's internal logic. A private function used only by facade-generator stays in `generators/facade/`. Do not prematurely share it.
 
 ### Signals that something should be extracted
 
@@ -203,7 +241,7 @@ test-fixtures/
 
 Generators are pure pipeline stages: they take typed input and produce typed output. They do not call other generators.
 
-The orchestrator (`src/orchestrator/`) is the place that wires generators into full pipelines. It is the only code (besides the workbench and tests) that imports multiple generators together.
+The orchestrator (`src/orchestrator/`) is the place that wires generators into full pipelines. It is the only code (besides viewers and tests) that imports multiple generators together.
 
 ```
 orchestrator calls: generatePlot → generateMassing → generateFacade → ... → assembleBuilding

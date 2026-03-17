@@ -1,7 +1,7 @@
 # env-lab Specification
 
 ## Purpose
-TBD - created by archiving change env-lab. Update Purpose after archive.
+Interactive 3D environment lab for experimenting with atmosphere, lighting, sky, and terrain rendering around generated buildings.
 ## Requirements
 ### Requirement: Layer system with three categories
 The env-lab SHALL support three layer categories: **water**, **sky**, and **terrain**. Each category SHALL have multiple swappable approaches that implement a common `EnvLayer` interface. Layers SHALL be independently swappable at runtime without page reload. Each approach SHALL expose typed `ParamDescriptor` entries for live tweaking.

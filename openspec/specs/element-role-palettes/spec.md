@@ -1,7 +1,7 @@
 # element-role-palettes Specification
 
 ## Purpose
-TBD - created by archiving change mediterranean-elements. Update Purpose after archive.
+Map element geometry part roles (frame, pane, shutter, slab, railing, etc.) to default palette colors for consistent rendering across all viewers.
 ## Requirements
 ### Requirement: ColorPalette type
 The system SHALL define a `ColorPalette` type that maps role strings to hex color numbers. The palette SHALL provide a color for every recognized role.

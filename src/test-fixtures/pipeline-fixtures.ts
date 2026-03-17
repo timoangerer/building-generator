@@ -1,4 +1,4 @@
-import { SceneResultSchema } from "@/contracts/scene.schema";
+import { SceneResultSchema } from "@/contracts";
 import { runCityPipeline } from "@/orchestrator";
 import type { SceneResult } from "@/contracts";
 import type { GeneratorFixture } from "./types";

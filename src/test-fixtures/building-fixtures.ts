@@ -1,4 +1,4 @@
-import { BuildingResultSchema } from "@/contracts/building.schema";
+import { BuildingResultSchema } from "@/contracts";
 import { assembleBuildings } from "@/generators/building";
 import type { BuildingResult, BuildingMassing, WallFacade } from "@/contracts";
 import type { GeneratorFixture } from "./types";

@@ -1,8 +1,8 @@
-import { FacadeResultSchema } from "@/contracts/facade.schema";
+import { FacadeResultSchema } from "@/contracts";
 import { generateFacade } from "@/generators/facade";
 import { generateElementCatalog } from "@/generators/element";
-import { computeElementBounds } from "@/generators/element/element-bounds";
-import { isFiniteCoord } from "@/test-utils/geometry-checks";
+import { computeElementBounds } from "@/core-geometry";
+import { isFiniteCoord } from "@/test-utils";
 import type { FacadeConfig, FacadeResult } from "@/contracts";
 import type { GeneratorFixture } from "./types";
 

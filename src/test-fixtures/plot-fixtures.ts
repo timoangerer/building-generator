@@ -1,6 +1,6 @@
-import { PlotResultSchema } from "@/contracts/plot.schema";
+import { PlotResultSchema } from "@/contracts";
 import { generatePlots } from "@/generators/plot";
-import { noOverlaps } from "@/test-utils/geometry-checks";
+import { noOverlaps } from "@/test-utils";
 import type { PlotConfig, PlotResult } from "@/contracts";
 import type { GeneratorFixture } from "./types";
 

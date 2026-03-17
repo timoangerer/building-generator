@@ -1,6 +1,6 @@
-import { ElementCatalogSchema } from "@/contracts/element.schema";
+import { ElementCatalogSchema } from "@/contracts";
 import { generateElementCatalog } from "@/generators/element";
-import { computeElementBounds } from "@/generators/element/element-bounds";
+import { computeElementBounds } from "@/core-geometry";
 import type { ElementCatalogConfig, ElementCatalog, GeometryPart } from "@/contracts";
 import type { GeneratorFixture } from "./types";
 

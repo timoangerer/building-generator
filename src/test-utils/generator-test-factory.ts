@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { z } from "zod";
-import type { GeneratorFixture, Invariant } from "@/test-fixtures/types";
+import type { GeneratorFixture, Invariant } from "@/test-fixtures";
 
 type TestGeneratorOptions<TConfig, TResult> = {
   name: string;

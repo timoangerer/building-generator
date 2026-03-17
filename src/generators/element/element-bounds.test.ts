@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeElementBounds } from "./element-bounds";
+import { computeElementBounds } from "@/core-geometry";
 import { generateElementCatalog } from "./element-generator";
 import type { ElementDefinition, Vec3 } from "@/contracts";
 

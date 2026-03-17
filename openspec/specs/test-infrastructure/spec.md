@@ -1,7 +1,7 @@
 # test-infrastructure Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+Generator test harness that runs any generator fixture across multiple seeds, validating schema conformance and behavioral invariants automatically.
 ## Requirements
 ### Requirement: Generic generator test factory
 The system SHALL provide a `testGeneratorInvariants` function that accepts a generator function, Zod schema, config factory, and invariant table, and produces a full Vitest test suite including schema validation across multiple seeds and a determinism check. The function SHALL also accept a `GeneratorFixture` object directly (which contains the same fields), enabling test files to pass a shared fixture with a single call.

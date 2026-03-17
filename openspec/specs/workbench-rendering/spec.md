@@ -1,7 +1,7 @@
 # workbench-rendering Specification
 
 ## Purpose
-TBD - browser workbench rendering of generated buildings using Three.js with InstancedMesh for facade elements and per-building color variation.
+Browser workbench rendering of generated buildings using Three.js with InstancedMesh for facade elements and per-building color variation.
 ## Requirements
 ### Requirement: Facade element rendering with InstancedMesh
 The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elements with `"box"` geometry, it SHALL create a single InstancedMesh using the element's box dimensions. For elements with `"composite"` geometry, it SHALL create one InstancedMesh per unique (elementId, role) combination, where each InstancedMesh renders the geometry parts matching that role. Each instance SHALL be positioned according to the placement's position and rotationY. When a placement has an optional `scale` field set, the instance transform SHALL apply that scale before computing the matrix.

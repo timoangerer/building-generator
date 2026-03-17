@@ -5,16 +5,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { runCityPipeline } from "@/orchestrator";
 import type { SceneResult, Building, ElementDefinition, GeometryPart, ColorPalette } from "@/contracts";
-import { createRng } from "@/utils";
+import { buildPartGeometry, buildingBaseColor } from "@/rendering";
 import "../index.css";
-
-function buildingColor(seed: number, buildingIndex: number): THREE.Color {
-  const rng = createRng(seed + buildingIndex * 7);
-  // Base warm tone: HSL ~30°, 50% sat, 65% lightness, with ±15° hue shift
-  const hueShift = (rng() * 2 - 1) * (15 / 360);
-  const baseHue = 30 / 360;
-  return new THREE.Color().setHSL(baseHue + hueShift, 0.5, 0.65);
-}
 
 function buildThreeScene(
   container: HTMLElement,
@@ -71,7 +63,7 @@ function buildThreeScene(
       d = Math.max(d, Math.abs(v.z - bz) * 2);
     }
 
-    const color = buildingColor(seed, bi);
+    const color = buildingBaseColor(seed, bi);
     const buildingMat = new THREE.MeshToonMaterial({ color });
 
     const geo = new THREE.BoxGeometry(w, m.totalHeight, d);
@@ -112,41 +104,6 @@ function buildThreeScene(
   // Create InstancedMesh objects for facade elements
   const palette = elementCatalog.defaultPalette;
   const dummy = new THREE.Object3D();
-
-  function buildPartGeometry(part: GeometryPart): THREE.BufferGeometry {
-    switch (part.shape) {
-      case "box":
-        return new THREE.BoxGeometry(
-          part.dimensions.width,
-          part.dimensions.height,
-          part.dimensions.depth,
-        );
-      case "cylinder":
-        return new THREE.CylinderGeometry(
-          part.dimensions.radius,
-          part.dimensions.radius,
-          part.dimensions.height,
-          16,
-        );
-      case "half_cylinder": {
-        // Half cylinder for arch: semicircle in XY plane (curve up), depth along Z
-        // thetaStart=PI/2 puts the curved surface on +Y when viewed from front after rotation
-        const geo = new THREE.CylinderGeometry(
-          part.dimensions.radius,
-          part.dimensions.radius,
-          part.dimensions.depth,
-          16,
-          1,
-          false,
-          Math.PI / 2,
-          Math.PI,
-        );
-        // Rotate axis from Y to Z so depth goes along Z, arch profile visible from front
-        geo.rotateX(Math.PI / 2);
-        return geo;
-      }
-    }
-  }
 
   function paletteColor(role: string): number {
     return palette[role] ?? 0x808080;

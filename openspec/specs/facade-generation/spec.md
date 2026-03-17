@@ -1,7 +1,7 @@
 # facade-generation Specification
 
 ## Purpose
-TBD - procedural facade generation that places window and door elements on exposed building walls using a grid-bay grammar.
+Procedural facade generation that places window and door elements on exposed building walls using a bay-grid grammar with per-building style variation.
 ## Requirements
 ### Requirement: Grid-bay facade placement
 The facade generator SHALL divide each exposed wall into bays of width `bayWidth` with `edgeMargin` on each side, and place one element per bay per floor.

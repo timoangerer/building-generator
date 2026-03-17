@@ -1,14 +1,14 @@
 # facade-lab Specification
 
 ## Purpose
-TBD - created by archiving change facade-2d-debug-view. Update Purpose after archive.
+Interactive 2D debug viewer for facade decomposition, rendering wall facades with element placements on a Canvas 2D surface with wireframe and rendered modes.
 ## Requirements
 ### Requirement: Separate Vite entry point
-The facade lab SHALL have its own HTML shell (`facade-lab.html`), Vite config (`vite.facade-lab.config.ts`), and dev script (`dev:facade-lab`) following the env-lab pattern.
+The facade lab SHALL have its own HTML shell (`src/facade-lab/index.html`) and dev script (`dev:facade-lab`) served by the unified Vite config.
 
 #### Scenario: Dev server launches facade lab
 - **WHEN** `npm run dev:facade-lab` is executed
-- **THEN** a browser SHALL open to `/facade-lab.html` showing the facade lab viewer
+- **THEN** a browser SHALL open to `/src/facade-lab/index.html` showing the facade lab viewer
 
 ### Requirement: Data source layer
 The facade lab SHALL expose a pure data layer with `getFacadeLabData(seed)` returning building/wall listings and `getWallFacadeView(seed, buildingIndex, wallIndex)` returning a `FacadeLabView` with wall, floors, bay dimensions, placements, element catalog, and computed metrics.
