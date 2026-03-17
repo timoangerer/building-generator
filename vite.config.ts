@@ -14,10 +14,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         workbench: "src/workbench/index.html",
-        gallery: "src/gallery/index.html",
-        "env-lab": "src/env-lab/index.html",
-        "facade-lab": "src/facade-lab/index.html",
-        "plot-lab": "src/plot-lab/index.html",
       },
     },
   },

@@ -1,7 +1,7 @@
 # workbench-rendering Specification
 
 ## Purpose
-Browser workbench rendering of generated buildings using Three.js with InstancedMesh for facade elements and per-building color variation.
+Browser workbench rendering of generated buildings using Three.js — renderers now consolidated under `src/viewers/stages/` with shared infrastructure in `src/viewers/shared/`.
 ## Requirements
 ### Requirement: Facade element rendering with InstancedMesh
 The workbench SHALL render facade elements using `THREE.InstancedMesh`. For elements with `"box"` geometry, it SHALL create a single InstancedMesh using the element's box dimensions. For elements with `"composite"` geometry, it SHALL create one InstancedMesh per unique (elementId, role) combination, where each InstancedMesh renders the geometry parts matching that role. Each instance SHALL be positioned according to the placement's position and rotationY. When a placement has an optional `scale` field set, the instance transform SHALL apply that scale before computing the matrix.
@@ -44,3 +44,24 @@ Facade element meshes SHALL use material colors derived from the element catalog
 - **WHEN** facade elements are rendered
 - **THEN** element materials SHALL use colors visually distinct from the building wall material
 
+### Requirement: Renderer module location
+All stage renderers SHALL reside under `src/viewers/stages/`. Shared Three.js infrastructure (context setup, geometry utilities) SHALL reside under `src/viewers/shared/`. The old `src/rendering/index.ts` and `src/gallery/renderers/` directories SHALL be removed.
+
+#### Scenario: Renderers import shared utilities from viewers
+- **WHEN** a stage renderer needs Three.js setup
+- **THEN** it SHALL import from `../shared/three-setup` (within the viewers module)
+
+#### Scenario: Old rendering module removed
+- **WHEN** the project is built
+- **THEN** there SHALL be no `src/rendering/index.ts` file
+
+### Requirement: Lint rules updated
+The `no-three-outside-rendering` lint rule SHALL allow Three.js imports in `src/viewers/` only (replacing the previous list of `workbench`, `gallery`, `env-lab`, `facade-lab`, `plot-lab`, `rendering`). The `no-internal-module-imports` rule SHALL list `viewers` as a module root (replacing `gallery`, `env-lab`, `facade-lab`, `plot-lab`, `rendering`).
+
+#### Scenario: Viewers directory allowed for Three.js
+- **WHEN** a file under `src/viewers/` imports from `three`
+- **THEN** the lint rule SHALL not report a violation
+
+#### Scenario: Workbench directory no longer needs Three.js allowance
+- **WHEN** a file under `src/workbench/` imports from `three`
+- **THEN** the lint rule SHALL report a violation (workbench delegates to viewers)

@@ -1,7 +1,7 @@
 # env-lab Specification
 
 ## Purpose
-Interactive 3D environment lab for experimenting with atmosphere, lighting, sky, and terrain rendering around generated buildings.
+Interactive 3D environment system for experimenting with atmosphere, lighting, sky, and terrain rendering — now a reusable module under `src/viewers/environment/` embedded in the unified workbench.
 ## Requirements
 ### Requirement: Layer system with three categories
 The env-lab SHALL support three layer categories: **water**, **sky**, and **terrain**. Each category SHALL have multiple swappable approaches that implement a common `EnvLayer` interface. Layers SHALL be independently swappable at runtime without page reload. Each approach SHALL expose typed `ParamDescriptor` entries for live tweaking.
@@ -56,12 +56,41 @@ The env-lab SHALL provide named presets (Minimal, Diorama, Tropical, Dramatic) t
 - **WHEN** the user manually changes any control after selecting a preset
 - **THEN** the preset display SHALL show "Custom"
 
-### Requirement: Standalone viewer entry point
-The env-lab SHALL be a separate Vite entry point with `dev:env-lab` script, rendering a Three.js scene with PerspectiveCamera, OrbitControls, and warm directional + hemisphere lighting. A React overlay control panel SHALL provide preset dropdown, layer approach dropdowns (auto-populated from registry), per-approach parameter controls, and fog controls.
+### Requirement: Module location
+The env-lab scene, layer system, presets, registry, and all layer implementations SHALL reside under `src/viewers/environment/`. A barrel export at `src/viewers/environment/index.ts` SHALL expose `createEnvScene`, `EnvSceneApi`, `presets`, `getLayerIds`, and all relevant types.
 
-#### Scenario: Dev server launches env-lab
-- **WHEN** the user runs `npm run dev:env-lab`
-- **THEN** the browser SHALL open to `env-lab.html` showing the environment lab viewer
+#### Scenario: Env module importable from viewers
+- **WHEN** a module imports from `@/viewers`
+- **THEN** it SHALL be able to access `createEnvScene`, `presets`, and `EnvSceneApi`
+
+### Requirement: ToolRenderer-based env renderer
+The env-lab SHALL provide an `EnvRendererHandle` that extends `ToolRenderer` with a `getApi()` method returning the `EnvSceneApi`. The renderer SHALL be registered in the tool renderer factory under the id `"environment"`.
+
+#### Scenario: Env renderer mounts and exposes API
+- **WHEN** the env renderer is mounted
+- **THEN** `getApi()` SHALL return a non-null `EnvSceneApi` instance
+
+#### Scenario: Env renderer loads first preset on mount
+- **WHEN** the env renderer is mounted
+- **THEN** it SHALL automatically load the first preset's layer selections and fog configuration
+
+### Requirement: Extracted Leva controls component
+The env-lab SHALL provide an `EnvLabControls` React component that accepts an `EnvSceneApi` prop and renders Leva controls for preset selection, per-category layer selection, per-layer parameter tweaking, and fog configuration. This component SHALL be importable from `@/viewers`.
+
+#### Scenario: Controls render when API is available
+- **WHEN** `EnvLabControls` is rendered with a non-null API
+- **THEN** Leva panels for Preset, Terrain, Sky, Water, and Fog SHALL appear
+
+#### Scenario: Controls handle null API gracefully
+- **WHEN** `EnvLabControls` is rendered with a null API
+- **THEN** it SHALL render without errors and wait for API availability
+
+### Requirement: Standalone entry point removed
+The standalone `src/env-lab/index.html` entry point and `dev:env-lab` npm script SHALL be removed. The environment viewer is accessible only through the workbench's tool section.
+
+#### Scenario: No env-lab entry point
+- **WHEN** the project is built
+- **THEN** there SHALL be no `env-lab` entry in Vite's rollup inputs
 
 ### Requirement: Layer registry
 The env-lab SHALL use a central registry that maps string IDs to factory functions. The control panel SHALL read available approaches from the registry. Adding a new approach SHALL require only implementing the file and registering it in the registry.
@@ -76,4 +105,3 @@ Switching any layer at runtime MUST NOT leak Three.js objects. `dispose()` SHALL
 #### Scenario: Dispose called before new layer
 - **WHEN** the user switches a layer approach
 - **THEN** the previous layer's `dispose()` SHALL be called before the new layer's `create()`
-

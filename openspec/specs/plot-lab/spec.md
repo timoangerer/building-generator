@@ -1,14 +1,21 @@
 # plot-lab Specification
 
 ## Purpose
-Interactive debug viewer for the plot generator, visualizing plot subdivisions with seed controls and dimension overlays.
+Interactive debug viewer for the plot generator — standalone entry point removed, plot rendering accessible through the workbench's plot stage renderer.
 ## Requirements
-### Requirement: Standalone entry point
-The plot-lab SHALL be a standalone frontend entry point with its own HTML file (`plot-lab.html`), Vite config (`vite.plot-lab.config.ts`), and npm script (`dev:plot-lab`), following the env-lab pattern.
+### Requirement: Standalone entry point removed
+The standalone `src/plot-lab/index.html` entry point, `src/plot-lab/viewer/main.tsx`, `src/plot-lab/viewer/plot-canvas.tsx`, and `dev:plot-lab` npm script SHALL be removed. Plot visualization is accessible only through the workbench's plot stage renderer.
 
-#### Scenario: Dev server launches plot-lab
-- **WHEN** the user runs `npm run dev:plot-lab`
-- **THEN** the browser SHALL open to `plot-lab.html` showing the plot debug viewer
+#### Scenario: No plot-lab entry point
+- **WHEN** the project is built
+- **THEN** there SHALL be no `plot-lab` entry in Vite's rollup inputs
+
+### Requirement: Plot rendering preserved
+The plot stage renderer under `src/viewers/stages/plot-renderer.ts` SHALL continue to render `PlotResult` data as a top-down 2D canvas with row-based coloring, plot ID labels, and street rendering.
+
+#### Scenario: Plot renderer accessible from workbench
+- **WHEN** the workbench selects a plot fixture
+- **THEN** the plot renderer SHALL display the plot result in the viewport
 
 ### Requirement: 2D top-down plot rendering
 The plot-lab SHALL render all plots from a `PlotResult` as filled rectangles on an HTML Canvas 2D context, viewed from top-down. The X axis of plot data SHALL map to the horizontal canvas axis, and the Z axis SHALL map to the vertical canvas axis.

@@ -1,35 +1,31 @@
 # facade-lab Specification
 
 ## Purpose
-Interactive 2D debug viewer for facade decomposition, rendering wall facades with element placements on a Canvas 2D surface with wireframe and rendered modes.
+2D facade rendering and data source utilities for visualizing facade decomposition — now located under `src/viewers/stages/` with standalone entry point removed.
 ## Requirements
-### Requirement: Public API barrel export
-The facade-lab module SHALL export its core rendering function and types from `src/facade-lab/index.ts` so that other modules (e.g., gallery renderers) can reuse the 2D facade rendering logic without importing internal paths.
+### Requirement: Module location
+The facade canvas renderer SHALL reside at `src/viewers/stages/facade-canvas.ts`. The facade data source SHALL reside at `src/viewers/stages/facade-data.ts` with its test at `src/viewers/stages/facade-data.test.ts`.
 
-#### Scenario: renderFacade2D is importable from barrel
-- **WHEN** a module imports `renderFacade2D` from `@/facade-lab`
-- **THEN** it SHALL receive the 2D canvas rendering function
+#### Scenario: Facade canvas importable from viewers
+- **WHEN** a module imports the facade canvas rendering function
+- **THEN** it SHALL import from `src/viewers/stages/facade-canvas.ts`
 
-#### Scenario: Types are importable from barrel
-- **WHEN** a module imports `ViewMode` and `FacadeLabView` from `@/facade-lab`
-- **THEN** it SHALL receive the view mode enum/type and the facade view data structure
+### Requirement: Standalone entry point removed
+The standalone `src/facade-lab/index.html` entry point, `src/facade-lab/index.ts` barrel export, `src/facade-lab/viewer/main.tsx`, and `dev:facade-lab` npm script SHALL be removed. Facade visualization is accessible only through the workbench's facade stage renderer.
 
-### Requirement: Separate Vite entry point
-The facade lab SHALL have its own HTML shell (`src/facade-lab/index.html`) and dev script (`dev:facade-lab`) served by the unified Vite config.
+#### Scenario: No facade-lab entry point
+- **WHEN** the project is built
+- **THEN** there SHALL be no `facade-lab` entry in Vite's rollup inputs
 
-#### Scenario: Dev server launches facade lab
-- **WHEN** `npm run dev:facade-lab` is executed
-- **THEN** a browser SHALL open to `/src/facade-lab/index.html` showing the facade lab viewer
-
-### Requirement: Data source layer
-The facade lab SHALL expose a pure data layer with `getFacadeLabData(seed)` returning building/wall listings and `getWallFacadeView(seed, buildingIndex, wallIndex)` returning a `FacadeLabView` with wall, floors, bay dimensions, placements, element catalog, and computed metrics.
+### Requirement: Data source layer preserved
+The `getFacadeLabData(seed)` and `getWallFacadeView(seed, buildingIndex, wallIndex)` functions SHALL continue to work identically from their new location at `src/viewers/stages/facade-data.ts`. The facade lab SHALL expose a pure data layer with `getFacadeLabData(seed)` returning building/wall listings and `getWallFacadeView(seed, buildingIndex, wallIndex)` returning a `FacadeLabView` with wall, floors, bay dimensions, placements, element catalog, and computed metrics.
 
 #### Scenario: Data source returns valid structure
 - **WHEN** `getWallFacadeView` is called with a valid seed, building index, and wall index
 - **THEN** the returned `FacadeLabView` SHALL contain `wall`, `floors`, `bayWidth`, `edgeMargin`, `placements`, `elementCatalog`, `bayCount`, and `usableWidth`
 
-#### Scenario: Data source is deterministic
-- **WHEN** `getWallFacadeView` is called twice with the same arguments
+#### Scenario: Data source is deterministic at new location
+- **WHEN** `getWallFacadeView` is called twice with the same arguments from the new module path
 - **THEN** both results SHALL be deeply equal
 
 #### Scenario: Bay count matches usable width
@@ -71,4 +67,3 @@ The viewer SHALL include a ShadCN/Tailwind control panel with: seed input, build
 #### Scenario: State changes trigger re-render
 - **WHEN** any control panel input changes (seed, building, wall, mode)
 - **THEN** the canvas SHALL re-render with the updated data
-

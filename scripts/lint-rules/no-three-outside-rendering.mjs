@@ -2,12 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { resolve, relative } from "node:path";
 
 const ALLOWED_DIRS = [
-  "workbench",
-  "gallery",
-  "env-lab",
-  "facade-lab",
-  "plot-lab",
-  "rendering",
+  "viewers",
 ];
 
 export async function check() {
@@ -31,8 +26,8 @@ export async function check() {
         const relPath = relative(root, file);
         messages.push(
           `Three.js import found in '${relPath}', which is not a rendering module.`,
-          `FIX: Move rendering code to an appropriate viewer module (workbench/,`,
-          `gallery/, env-lab/, etc.) or produce plain data that viewers convert`,
+          `FIX: Move rendering code to an appropriate viewer module (gallery/,`,
+          `env-lab/, etc.) or produce plain data that viewers convert`,
           `to Three.js state. See docs/architecture-principles.md.`,
         );
       }

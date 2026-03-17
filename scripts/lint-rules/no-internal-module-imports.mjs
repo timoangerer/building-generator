@@ -8,11 +8,7 @@ const MODULE_ROOTS = [
   "core-geometry",
   "orchestrator",
   "workbench",
-  "gallery",
-  "env-lab",
-  "facade-lab",
-  "plot-lab",
-  "rendering",
+  "viewers",
   "test-fixtures",
   "test-utils",
 ];
