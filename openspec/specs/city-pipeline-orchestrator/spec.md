@@ -1,7 +1,7 @@
 # city-pipeline-orchestrator Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+Orchestrate the full city generation pipeline, wiring plot → massing → element → facade → building stages into a single `runCityPipeline(seed)` call that produces a complete `SceneResult`.
 ## Requirements
 ### Requirement: End-to-end pipeline wiring
 The orchestrator SHALL provide a `runCityPipeline(seed: number): SceneResult` function (or similar) that calls all generator stages in sequence: plots → massing → element catalog → facade → building assembly → scene composition. The output SHALL be a valid SceneResult.

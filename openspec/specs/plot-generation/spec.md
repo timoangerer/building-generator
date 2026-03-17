@@ -1,7 +1,7 @@
 # plot-generation Specification
 
 ## Purpose
-TBD - procedural plot subdivision generating two rows of varying-width rectangular plots flanking a central street.
+Procedural plot subdivision generating two rows of varying-width rectangular plots flanking a central street, with configurable dimensions and seeded randomness.
 
 ## Requirements
 ### Requirement: Seeded random plot subdivision

@@ -1,7 +1,7 @@
 # stub-generators Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+Initial stub implementations of pipeline generators that produce minimal valid output conforming to contracts, used as scaffolding during early development.
 ## Requirements
 ### Requirement: Plot generator stub
 The system SHALL provide a `generatePlots(config: PlotConfig): PlotResult` function that uses seeded RNG to subdivide two rows into varying-width plots flanking a central street. The output SHALL validate against the PlotResult Zod schema and contain plots with widths within `[minPlotWidth, maxPlotWidth]`.

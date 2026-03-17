@@ -1,4 +1,4 @@
-import { MassingResultSchema } from "@/contracts/massing.schema";
+import { MassingResultSchema } from "@/contracts";
 import { generateMassing } from "@/generators/massing";
 import type { MassingConfig, MassingResult } from "@/contracts";
 import type { GeneratorFixture } from "./types";

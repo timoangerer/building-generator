@@ -1,7 +1,7 @@
 # plot-lab Specification
 
 ## Purpose
-TBD - created by archiving change plot-debug-viewer. Update Purpose after archive.
+Interactive debug viewer for the plot generator, visualizing plot subdivisions with seed controls and dimension overlays.
 ## Requirements
 ### Requirement: Standalone entry point
 The plot-lab SHALL be a standalone frontend entry point with its own HTML file (`plot-lab.html`), Vite config (`vite.plot-lab.config.ts`), and npm script (`dev:plot-lab`), following the env-lab pattern.

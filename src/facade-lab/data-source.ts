@@ -1,5 +1,5 @@
 import { runCityPipeline } from "@/orchestrator";
-import { computeElementBounds, type ElementBounds } from "@/generators/element/element-bounds";
+import { computeElementBounds, type ElementBounds } from "@/core-geometry";
 import type {
   WallSegment,
   FloorInfo,

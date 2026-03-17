@@ -1,7 +1,7 @@
 # test-fixtures Specification
 
 ## Purpose
-TBD - created by archiving change visual-test-ui. Update Purpose after archive.
+Reusable test fixture factories for all generator stages, providing config factories, seed sets, Zod schema validation, and behavioral invariant checks.
 ## Requirements
 ### Requirement: GeneratorFixture type definition
 The system SHALL provide a `GeneratorFixture<TConfig, TResult>` type in `src/test-fixtures/types.ts` that includes: `name` (display name), `stage` (routing key string), `generator` (function from TConfig to TResult), `schema` (Zod schema for TResult), `configFactory` (function from seed number to TConfig), `seeds` (array of canonical seed numbers), and `invariants` (array of `Invariant<TResult>` objects with `name` and `check` fields).

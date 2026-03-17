@@ -8,7 +8,7 @@ import type {
   Vec3,
 } from "@/contracts";
 import { createRng } from "@/utils";
-import { computeElementBounds, type ElementBounds } from "@/generators/element/element-bounds";
+import { computeElementBounds, type ElementBounds } from "@/core-geometry";
 
 const SILL_HEIGHT = 0.9;
 

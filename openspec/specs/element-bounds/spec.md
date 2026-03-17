@@ -1,10 +1,10 @@
 # element-bounds Specification
 
 ## Purpose
-TBD - created by archiving change facade-2d-debug-view. Update Purpose after archive.
+Compute axis-aligned bounding boxes for composite element definitions, producing width/height/depth and offset from element origin. Used by facade generation and debug viewers.
 ## Requirements
 ### Requirement: Compute element bounding box
-The `computeElementBounds` function SHALL accept an `ElementDefinition` and return an `ElementBounds` object with `width`, `height`, and `depth` representing the axis-aligned bounding box of all geometry parts combined.
+The `computeElementBounds` function SHALL accept an `ElementDefinition` and return an `ElementBounds` object with `width`, `height`, `depth`, `offsetX`, `offsetY`, and `offsetZ` representing the axis-aligned bounding box of all geometry parts combined. The offset fields represent the displacement from the element origin to the bounding box center in element-local coordinates.
 
 #### Scenario: Single box part
 - **WHEN** an element has a single box part at position (0,0,0) with dimensions 0.6w × 1.3h × 0.08d

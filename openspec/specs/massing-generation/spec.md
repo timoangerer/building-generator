@@ -1,7 +1,7 @@
 # massing-generation Specification
 
 ## Purpose
-TBD - procedural massing generation that extrudes plot footprints into buildings with random floor counts, height variation, wall segments, and party wall detection.
+Procedural massing generation that extrudes plot footprints into buildings with seeded floor counts, height variation, wall segments, and party wall detection.
 
 ## Requirements
 ### Requirement: Random floor count per building

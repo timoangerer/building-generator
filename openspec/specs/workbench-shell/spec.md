@@ -1,7 +1,7 @@
 # workbench-shell Specification
 
 ## Purpose
-TBD - created by archiving change project-skeleton. Update Purpose after archive.
+React shell for the workbench viewer, mounting the Three.js scene and providing the browser entry point for the primary development view.
 ## Requirements
 ### Requirement: React app with Three.js canvas
 The workbench SHALL be a React application that renders a Three.js scene in a canvas element. It SHALL call the orchestrator pipeline on mount with a default config and seed.

@@ -1,7 +1,7 @@
 # composite-element-geometry Specification
 
 ## Purpose
-TBD - created by archiving change mediterranean-elements. Update Purpose after archive.
+Define composite element geometry using multi-part descriptions (box, cylinder, half_cylinder shapes) with per-part roles and positions, enabling rich architectural elements like arched windows and balcony doors.
 ## Requirements
 ### Requirement: Composite geometry type
 The `ElementGeometry` union SHALL support a `"composite"` variant: `{ type: "composite", parts: GeometryPart[] }`. The `parts` array SHALL contain at least one `GeometryPart`.

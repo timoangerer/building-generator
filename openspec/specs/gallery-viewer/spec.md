@@ -1,7 +1,7 @@
 # gallery-viewer Specification
 
 ## Purpose
-TBD - created by archiving change visual-test-ui. Update Purpose after archive.
+Multi-stage visual test gallery that renders each pipeline stage (plot, massing, element, facade, scene) side-by-side with configurable seeds and rendering options.
 ## Requirements
 ### Requirement: Gallery Vite entry point
 The system SHALL provide a `gallery.html` entry point, `vite.gallery.config.ts` Vite config, and `src/gallery/main.tsx` React entry point. The gallery SHALL be launchable via `npm run dev:gallery`.
