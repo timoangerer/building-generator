@@ -3,6 +3,17 @@
 ## Purpose
 Interactive 2D debug viewer for facade decomposition, rendering wall facades with element placements on a Canvas 2D surface with wireframe and rendered modes.
 ## Requirements
+### Requirement: Public API barrel export
+The facade-lab module SHALL export its core rendering function and types from `src/facade-lab/index.ts` so that other modules (e.g., gallery renderers) can reuse the 2D facade rendering logic without importing internal paths.
+
+#### Scenario: renderFacade2D is importable from barrel
+- **WHEN** a module imports `renderFacade2D` from `@/facade-lab`
+- **THEN** it SHALL receive the 2D canvas rendering function
+
+#### Scenario: Types are importable from barrel
+- **WHEN** a module imports `ViewMode` and `FacadeLabView` from `@/facade-lab`
+- **THEN** it SHALL receive the view mode enum/type and the facade view data structure
+
 ### Requirement: Separate Vite entry point
 The facade lab SHALL have its own HTML shell (`src/facade-lab/index.html`) and dev script (`dev:facade-lab`) served by the unified Vite config.
 

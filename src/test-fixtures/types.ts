@@ -12,5 +12,6 @@ export type GeneratorFixture<TConfig, TResult> = {
   schema: z.ZodType<TResult>;
   configFactory: (seed: number) => TConfig;
   seeds: number[];
+  labels?: string[];
   invariants: Invariant<TResult>[];
 };

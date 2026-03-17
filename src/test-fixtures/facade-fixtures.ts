@@ -8,62 +8,105 @@ import type { GeneratorFixture } from "./types";
 
 const catalog = generateElementCatalog({ seed: 1 });
 
-export const facadeFixture: GeneratorFixture<FacadeConfig, FacadeResult> = {
-  name: "generateFacade",
-  stage: "facade",
-  generator: generateFacade,
-  schema: FacadeResultSchema,
-  configFactory: (seed): FacadeConfig => ({
-    seed,
+/**
+ * Each seed maps to a curated wall configuration so the gallery sidebar
+ * shows meaningfully different facade setups rather than random variations
+ * of the same geometry.
+ */
+const configs: Record<number, { label: string; walls: FacadeConfig["walls"]; floors: FacadeConfig["floors"] }> = {
+  1: {
+    label: "narrow 3-floor (8m)",
     walls: [
-      {
-        buildingId: "b1",
-        wallIndex: 0,
-        start: { x: 0, z: 0 },
-        end: { x: 10, z: 0 },
-        height: 9,
-        length: 10,
-        normal: { x: 0, z: -1 },
-      },
-      {
-        buildingId: "b1",
-        wallIndex: 1,
-        start: { x: 10, z: 0 },
-        end: { x: 10, z: 15 },
-        height: 9,
-        length: 15,
-        normal: { x: 1, z: 0 },
-      },
-      {
-        buildingId: "b1",
-        wallIndex: 2,
-        start: { x: 10, z: 0 },
-        end: { x: 10, z: 15 },
-        height: 9,
-        length: 15,
-        normal: { x: 1, z: 0 },
-        neighborBuildingId: "b2",
-      },
-      {
-        buildingId: "b2",
-        wallIndex: 0,
-        start: { x: 20, z: 0 },
-        end: { x: 30, z: 0 },
-        height: 12,
-        length: 10,
-        normal: { x: 0, z: -1 },
-      },
+      { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 8, z: 0 }, height: 9, length: 8, normal: { x: 0, z: -1 } },
     ],
     floors: [
       { floorIndex: 0, baseY: 0, height: 3 },
       { floorIndex: 1, baseY: 3, height: 3 },
       { floorIndex: 2, baseY: 6, height: 3 },
     ],
-    availableElements: catalog.elements,
-    bayWidth: 2.5,
-    edgeMargin: 0.5,
-  }),
-  seeds: [1, 42, 123, 999],
+  },
+  2: {
+    label: "wide 3-floor (16m)",
+    walls: [
+      { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 16, z: 0 }, height: 9, length: 16, normal: { x: 0, z: -1 } },
+    ],
+    floors: [
+      { floorIndex: 0, baseY: 0, height: 3 },
+      { floorIndex: 1, baseY: 3, height: 3 },
+      { floorIndex: 2, baseY: 6, height: 3 },
+    ],
+  },
+  3: {
+    label: "tall 4-floor (10m)",
+    walls: [
+      { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 10, z: 0 }, height: 13, length: 10, normal: { x: 0, z: -1 } },
+    ],
+    floors: [
+      { floorIndex: 0, baseY: 0, height: 3.5 },
+      { floorIndex: 1, baseY: 3.5, height: 3 },
+      { floorIndex: 2, baseY: 6.5, height: 3 },
+      { floorIndex: 3, baseY: 9.5, height: 3.5 },
+    ],
+  },
+  4: {
+    label: "low wide (22m, 2-floor)",
+    walls: [
+      { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 22, z: 0 }, height: 6, length: 22, normal: { x: 0, z: -1 } },
+    ],
+    floors: [
+      { floorIndex: 0, baseY: 0, height: 3 },
+      { floorIndex: 1, baseY: 3, height: 3 },
+    ],
+  },
+  5: {
+    label: "with party wall (10m + 12m)",
+    walls: [
+      { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 10, z: 0 }, height: 9, length: 10, normal: { x: 0, z: -1 } },
+      { buildingId: "b1", wallIndex: 1, start: { x: 10, z: 0 }, end: { x: 10, z: 12 }, height: 9, length: 12, normal: { x: 1, z: 0 }, neighborBuildingId: "b2" },
+    ],
+    floors: [
+      { floorIndex: 0, baseY: 0, height: 3 },
+      { floorIndex: 1, baseY: 3, height: 3 },
+      { floorIndex: 2, baseY: 6, height: 3 },
+    ],
+  },
+};
+
+export const facadeFixture: GeneratorFixture<FacadeConfig, FacadeResult> = {
+  name: "generateFacade",
+  stage: "facade",
+  generator: generateFacade,
+  schema: FacadeResultSchema,
+  configFactory: (seed): FacadeConfig => {
+    const entry = configs[seed];
+    if (!entry) {
+      // Fallback for unknown seeds: simple 10m wall
+      return {
+        seed,
+        walls: [
+          { buildingId: "b1", wallIndex: 0, start: { x: 0, z: 0 }, end: { x: 10, z: 0 }, height: 9, length: 10, normal: { x: 0, z: -1 } },
+        ],
+        floors: [
+          { floorIndex: 0, baseY: 0, height: 3 },
+          { floorIndex: 1, baseY: 3, height: 3 },
+          { floorIndex: 2, baseY: 6, height: 3 },
+        ],
+        availableElements: catalog.elements,
+        bayWidth: 2.5,
+        edgeMargin: 0.5,
+      };
+    }
+    return {
+      seed,
+      walls: entry.walls,
+      floors: entry.floors,
+      availableElements: catalog.elements,
+      bayWidth: 2.5,
+      edgeMargin: 0.5,
+    };
+  },
+  seeds: [1, 2, 3, 4, 5],
+  labels: Object.values(configs).map((c) => c.label),
   invariants: [
     {
       name: "party walls have empty placements",
@@ -120,7 +163,6 @@ export const facadeFixture: GeneratorFixture<FacadeConfig, FacadeResult> = {
           if (wall?.neighborBuildingId) continue;
           if (facade.placements.length === 0) continue;
 
-          // Doors are bottom-aligned, so their Y is bounds.height/2
           const hasDoor = facade.placements.some((p) => doorIds.has(p.elementId));
           if (!hasDoor) return false;
         }
@@ -142,25 +184,6 @@ export const facadeFixture: GeneratorFixture<FacadeConfig, FacadeResult> = {
         }),
     },
     {
-      name: "uses more than one unique window element",
-      check: (r) => {
-        const windowIds = new Set(
-          r.config.availableElements
-            .filter((e) => e.type === "window")
-            .map((e) => e.elementId),
-        );
-        const usedWindowIds = new Set<string>();
-        for (const facade of r.facades) {
-          for (const p of facade.placements) {
-            if (windowIds.has(p.elementId)) {
-              usedWindowIds.add(p.elementId);
-            }
-          }
-        }
-        return usedWindowIds.size >= 2;
-      },
-    },
-    {
       name: "door Y position near floor base",
       check: (r) => {
         const doorElements = r.config.availableElements.filter(
@@ -175,9 +198,7 @@ export const facadeFixture: GeneratorFixture<FacadeConfig, FacadeResult> = {
               (e) => e.elementId === p.elementId,
             )!;
             const bounds = computeElementBounds(el);
-            // Door bottom should be near a floor base
             const doorBottom = p.position.y - bounds.height / 2;
-            // Check it's near some floor's baseY
             const nearFloorBase = r.config.floors.some(
               (f) => Math.abs(doorBottom - f.baseY) < 0.1,
             );

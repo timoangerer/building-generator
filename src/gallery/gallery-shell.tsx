@@ -4,6 +4,29 @@ import { allFixtures } from "@/test-fixtures";
 import type { GeneratorFixture } from "@/test-fixtures";
 import type { RenderOptions, InvariantResult, GalleryState } from "./types";
 import { getRenderer } from "./renderers";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 type Selection = {
   fixtureIndex: number;
@@ -17,6 +40,7 @@ export function GalleryShell() {
   const [generatedConfig, setGeneratedConfig] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof getRenderer> | null>(null);
+  const resultRef = useRef<unknown>(null);
 
   const selectedFixture = selection !== null ? allFixtures[selection.fixtureIndex] : null;
   const selectedSeed = selection !== null && selectedFixture
@@ -54,10 +78,17 @@ export function GalleryShell() {
     const config = fixture.configFactory(seed);
     const result = fixture.generator(config);
 
-    const results: InvariantResult[] = fixture.invariants.map((inv) => ({
-      name: inv.name,
-      passed: inv.check(result),
-    }));
+    const schemaResult = fixture.schema.safeParse(result);
+    const results: InvariantResult[] = [
+      {
+        name: "validates against schema",
+        passed: schemaResult.success,
+      },
+      ...fixture.invariants.map((inv) => ({
+        name: inv.name,
+        passed: inv.check(result),
+      })),
+    ];
 
     setGeneratedConfig(config);
     setGeneratedResult(result);
@@ -79,6 +110,7 @@ export function GalleryShell() {
     if (!selection || !viewportRef.current || !selectedFixture || selectedSeed === null) return;
 
     const result = runFixture(selectedFixture, selectedSeed);
+    resultRef.current = result;
 
     if (rendererRef.current) {
       rendererRef.current.dispose();
@@ -100,10 +132,10 @@ export function GalleryShell() {
   }, [selection, selectedFixture, selectedSeed, runFixture]);
 
   useEffect(() => {
-    if (rendererRef.current && generatedResult) {
-      rendererRef.current.update(generatedResult, renderOptions);
+    if (rendererRef.current && resultRef.current) {
+      rendererRef.current.update(resultRef.current, renderOptions);
     }
-  }, [renderOptions, generatedResult]);
+  }, [renderOptions]);
 
   const handleSeedStep = (delta: number) => {
     if (!selection || !selectedFixture) return;
@@ -116,89 +148,106 @@ export function GalleryShell() {
   const passedCount = invariantResults.filter((r) => r.passed).length;
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-200">
-      {/* Sidebar */}
-      <div className="w-64 border-r border-zinc-800 overflow-y-auto flex-shrink-0">
-        <div className="p-3 border-b border-zinc-800">
-          <h1 className="text-sm font-semibold text-zinc-100">Generator Gallery</h1>
-        </div>
-        {allFixtures.map((fixture, fi) => (
-          <div key={fixture.stage}>
-            <div className="px-3 py-2 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-              {fixture.stage}
-            </div>
-            {fixture.seeds.map((seed, si) => {
-              const isSelected = selection?.fixtureIndex === fi && selection?.seedIndex === si;
-              return (
-                <button
-                  key={seed}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${
-                    isSelected
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-                  }`}
-                  onClick={() => setSelection({ fixtureIndex: fi, seedIndex: si })}
-                >
-                  seed {seed}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+    <TooltipProvider>
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader>
+            <span className="text-sm font-semibold">Generator Gallery</span>
+          </SidebarHeader>
+          <SidebarContent>
+            {allFixtures.map((fixture, fi) => (
+              <SidebarGroup key={fixture.stage}>
+                <SidebarGroupLabel>{fixture.stage}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {fixture.seeds.map((seed, si) => {
+                      const isSelected = selection?.fixtureIndex === fi && selection?.seedIndex === si;
+                      const label = fixture.labels?.[si] ?? `seed ${seed}`;
+                      return (
+                        <SidebarMenuItem key={seed}>
+                          <SidebarMenuButton
+                            isActive={isSelected}
+                            data-testid={`seed-${fixture.stage}-${seed}`}
+                            onClick={() => setSelection({ fixtureIndex: fi, seedIndex: si })}
+                          >
+                            {label}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+          </SidebarContent>
+        </Sidebar>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Viewport + Leva */}
-        <div className="flex-1 flex min-h-0">
-          <div className="flex-1 relative min-w-0">
-            <Leva collapsed={false} titleBar={{ title: "Gallery" }} />
-            <div ref={viewportRef} className="absolute inset-0" />
+        <SidebarInset>
+          {/* Top bar */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b">
+            <span className="text-sm text-muted-foreground">
+              {selectedFixture && selection
+                ? `${selectedFixture.stage} / ${selectedFixture.labels?.[selection.seedIndex] ?? `seed ${selectedSeed}`}`
+                : "No selection"}
+            </span>
+            <div className="flex-1" />
+            {selection !== null && (
+              <Dialog>
+                <DialogTrigger render={<Button variant="outline" size="sm" />}>
+                  <span data-testid="gallery-invariants" className={
+                    passedCount === invariantResults.length ? "text-green-400" : "text-red-400"
+                  }>
+                    {passedCount}/{invariantResults.length} passed
+                  </span>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Invariants & Result</DialogTitle>
+                    <DialogDescription>
+                      {selectedFixture?.stage} / seed {selectedSeed}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Invariants</h4>
+                      {invariantResults.map((inv) => (
+                        <div key={inv.name} className="flex items-start gap-2 py-1">
+                          <span className={`mt-0.5 text-xs ${inv.passed ? "text-green-400" : "text-red-400"}`}>
+                            {inv.passed ? "✓" : "✗"}
+                          </span>
+                          <span className="text-sm">{inv.name}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {showJson && generatedResult !== null && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Result JSON</h4>
+                        <pre className="text-xs text-muted-foreground overflow-auto max-h-96 whitespace-pre-wrap break-all rounded-md bg-muted p-3">
+                          {JSON.stringify(generatedResult, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {/* Viewport */}
+          <div className="flex-1 relative min-h-0">
+            <div className="absolute top-2 right-2 z-10 w-[300px]">
+              <Leva fill collapsed={false} titleBar={{ title: "Controls" }} />
+            </div>
+            <div ref={viewportRef} className="absolute inset-0" data-testid="gallery-viewport" />
             {!selection && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground" data-testid="gallery-empty">
                 Select a fixture from the sidebar
               </div>
             )}
           </div>
-
-          {/* Right panel: invariants + JSON inspector */}
-          {selection !== null && (
-            <div className="w-72 border-l border-zinc-800 overflow-y-auto flex-shrink-0">
-              <div className="p-3 border-b border-zinc-800">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                    Invariants
-                  </span>
-                  <span className={`text-xs font-medium ${
-                    passedCount === invariantResults.length ? "text-green-400" : "text-red-400"
-                  }`}>
-                    {passedCount}/{invariantResults.length} passed
-                  </span>
-                </div>
-                {invariantResults.map((inv) => (
-                  <div key={inv.name} className="flex items-start gap-2 py-1">
-                    <span className={`mt-0.5 text-xs ${inv.passed ? "text-green-400" : "text-red-400"}`}>
-                      {inv.passed ? "✓" : "✗"}
-                    </span>
-                    <span className="text-xs text-zinc-300">{inv.name}</span>
-                  </div>
-                ))}
-              </div>
-
-              {showJson && generatedResult !== null && (
-                <div className="p-3">
-                  <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
-                    Result JSON
-                  </div>
-                  <pre className="text-xs text-zinc-400 overflow-auto max-h-96 whitespace-pre-wrap break-all">
-                    {JSON.stringify(generatedResult, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }
