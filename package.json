@@ -9,6 +9,7 @@
     "dev:gallery": "vite --config vite.gallery.config.ts",
     "dev:facade-lab": "vite --config vite.facade-lab.config.ts",
     "dev:plot-lab": "vite --config vite.plot-lab.config.ts",
+    "dev:water-clone": "vite --config vite.water-clone.config.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "node scripts/lint-workspace.mjs",
