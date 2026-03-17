@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Leva, useControls, button } from "leva";
 import { allFixtures } from "@/test-fixtures";
 import type { GeneratorFixture } from "@/test-fixtures";
 import type { RenderOptions, InvariantResult, GalleryState } from "./types";
-import { ControlBar } from "./control-bar";
 import { getRenderer } from "./renderers";
 
 type Selection = {
@@ -12,12 +12,6 @@ type Selection = {
 
 export function GalleryShell() {
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [renderOptions, setRenderOptions] = useState<RenderOptions>({
-    wireframe: false,
-    colorMode: "role",
-    showBounds: false,
-  });
-  const [showJson, setShowJson] = useState(false);
   const [invariantResults, setInvariantResults] = useState<InvariantResult[]>([]);
   const [generatedResult, setGeneratedResult] = useState<unknown>(null);
   const [generatedConfig, setGeneratedConfig] = useState<unknown>(null);
@@ -28,6 +22,33 @@ export function GalleryShell() {
   const selectedSeed = selection !== null && selectedFixture
     ? selectedFixture.seeds[selection.seedIndex]
     : null;
+
+  const { wireframe, colorMode, showBounds, showJson } = useControls("Display", {
+    wireframe: false,
+    colorMode: {
+      options: {
+        Role: "role" as const,
+        "Element Type": "element-type" as const,
+        Building: "building" as const,
+        Flat: "flat" as const,
+      },
+      value: "role" as const,
+    },
+    showBounds: false,
+    showJson: false,
+  });
+
+  const renderOptions: RenderOptions = { wireframe, colorMode, showBounds };
+
+  useControls("Seed", () => ({
+    info: {
+      value: selectedSeed !== null ? `seed ${selectedSeed}` : "none",
+      disabled: true,
+      editable: false,
+    },
+    "< prev": button(() => handleSeedStep(-1)),
+    "next >": button(() => handleSeedStep(1)),
+  }), [selection, selectedFixture]);
 
   const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, seed: number) => {
     const config = fixture.configFactory(seed);
@@ -42,7 +63,6 @@ export function GalleryShell() {
     setGeneratedResult(result);
     setInvariantResults(results);
 
-    // Expose gallery state for agent inspection
     const state: GalleryState = {
       stage: fixture.stage,
       seed,
@@ -60,7 +80,6 @@ export function GalleryShell() {
 
     const result = runFixture(selectedFixture, selectedSeed);
 
-    // Dispose previous renderer
     if (rendererRef.current) {
       rendererRef.current.dispose();
       rendererRef.current = null;
@@ -80,7 +99,6 @@ export function GalleryShell() {
     };
   }, [selection, selectedFixture, selectedSeed, runFixture]);
 
-  // Update renderer when options change
   useEffect(() => {
     if (rendererRef.current && generatedResult) {
       rendererRef.current.update(generatedResult, renderOptions);
@@ -131,22 +149,10 @@ export function GalleryShell() {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Control bar */}
-        <ControlBar
-          renderOptions={renderOptions}
-          onRenderOptionsChange={setRenderOptions}
-          showJson={showJson}
-          onShowJsonChange={setShowJson}
-          selectedSeed={selectedSeed}
-          seedCount={selectedFixture?.seeds.length ?? 0}
-          seedIndex={selection?.seedIndex ?? 0}
-          onSeedStep={handleSeedStep}
-        />
-
-        {/* Content area */}
+        {/* Viewport + Leva */}
         <div className="flex-1 flex min-h-0">
-          {/* Viewport */}
           <div className="flex-1 relative min-w-0">
+            <Leva collapsed={false} titleBar={{ title: "Gallery" }} />
             <div ref={viewportRef} className="absolute inset-0" />
             {!selection && (
               <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
@@ -158,7 +164,6 @@ export function GalleryShell() {
           {/* Right panel: invariants + JSON inspector */}
           {selection !== null && (
             <div className="w-72 border-l border-zinc-800 overflow-y-auto flex-shrink-0">
-              {/* Invariant results */}
               <div className="p-3 border-b border-zinc-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
@@ -180,7 +185,6 @@ export function GalleryShell() {
                 ))}
               </div>
 
-              {/* JSON inspector */}
               {showJson && generatedResult !== null && (
                 <div className="p-3">
                   <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
