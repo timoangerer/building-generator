@@ -4,6 +4,7 @@ import { createPlotRenderer } from "./plot-renderer";
 import { createMassingRenderer } from "./massing-renderer";
 import { createElementRenderer } from "./element-renderer";
 import { createFacadeRenderer } from "./facade-renderer";
+import { createBuildingRenderer } from "./building-renderer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rendererFactories: Record<string, () => StageRenderer<any>> = {
@@ -12,6 +13,7 @@ const rendererFactories: Record<string, () => StageRenderer<any>> = {
   massing: createMassingRenderer,
   element: createElementRenderer,
   facade: createFacadeRenderer,
+  building: createBuildingRenderer,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

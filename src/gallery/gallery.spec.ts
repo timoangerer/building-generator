@@ -4,8 +4,8 @@ const STAGES = [
   { stage: "plot", seeds: [1, 42, 123, 999], hasRenderer: true },
   { stage: "massing", seeds: [1, 42, 123, 999], hasRenderer: true },
   { stage: "element", seeds: [1, 42, 123, 999], hasRenderer: true },
-  { stage: "facade", seeds: [1, 42, 123, 999], hasRenderer: true },
-  { stage: "building", seeds: [1, 42, 123, 999], hasRenderer: false },
+  { stage: "facade", seeds: [1, 2, 3, 4, 5], hasRenderer: true },
+  { stage: "building", seeds: [1, 42, 123, 999], hasRenderer: true },
   { stage: "pipeline", seeds: [1, 42, 123, 999], hasRenderer: true },
 ];
 
