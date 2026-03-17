@@ -28,8 +28,13 @@ Read this first when working in this repo.
 
 - TypeScript, Vite, React, Three.js
 - ShadCN/ui + Tailwind for all non-3D UI (plain vanilla default theme, no custom styling)
+- Leva for viewer/debug GUI controls
 - Vitest for logic and contract tests
 - Playwright for browser and screenshot verification
+
+## Viewer / Debug UI Controls
+
+Use **Leva** (`useControls` from `leva`) for all parameter controls in viewers and debug tools (2D canvas viewers, 3D scenes, lab tools). Do not build custom React+Tailwind control panels for this purpose. Reference: `src/facade-lab/viewer/main.tsx`. ShadCN/Tailwind remains the choice for app-level UI (navigation, sidebars, data display) — Leva is specifically for tweakable parameters in visual viewers.
 
 ## OpenSpec
 
