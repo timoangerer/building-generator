@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Leva, useControls, button } from "leva";
+import { Leva, useControls } from "leva";
 import { allFixtures } from "@/test-fixtures";
 import type { GeneratorFixture } from "@/test-fixtures";
 import type {
@@ -83,34 +83,15 @@ export function WorkbenchShell() {
     ? selectedFixture.seeds[selection.itemIndex]
     : null;
 
-  const { wireframe, colorMode, showBounds, showJson } = useControls("Display", {
+  const { wireframe, showWall, showLabels } = useControls("Display", {
     wireframe: false,
-    colorMode: {
-      options: {
-        Role: "role" as const,
-        "Element Type": "element-type" as const,
-        Building: "building" as const,
-        Flat: "flat" as const,
-      },
-      value: "role" as const,
-    },
-    showBounds: false,
-    showJson: false,
+    showWall: false,
+    showLabels: false,
   });
 
-  const renderOptions: RenderOptions = { wireframe, colorMode, showBounds };
+  const renderOptions: RenderOptions = { wireframe, showWall, showLabels };
 
-  useControls("Seed", () => ({
-    info: {
-      value: selectedSeed !== null ? `seed ${selectedSeed}` : "none",
-      disabled: true,
-      editable: false,
-    },
-    "< prev": button(() => handleSeedStep(-1)),
-    "next >": button(() => handleSeedStep(1)),
-  }), [selection, selectedFixture]);
-
-  const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, seed: number) => {
+const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, seed: number) => {
     const config = fixture.configFactory(seed);
     const result = fixture.generator(config);
 
@@ -230,15 +211,7 @@ export function WorkbenchShell() {
     }
   }, [renderOptions]);
 
-  const handleSeedStep = (delta: number) => {
-    if (!selection || selection.kind !== "fixture" || !selectedFixture) return;
-    const newIndex = selection.itemIndex + delta;
-    if (newIndex >= 0 && newIndex < selectedFixture.seeds.length) {
-      setSelection({ ...selection, itemIndex: newIndex });
-    }
-  };
-
-  const passedCount = invariantResults.filter((r) => r.passed).length;
+const passedCount = invariantResults.filter((r) => r.passed).length;
 
   // Build sidebar label for current selection
   const selectionLabel = (() => {
@@ -354,7 +327,7 @@ export function WorkbenchShell() {
                       ))}
                     </div>
 
-                    {showJson && generatedResult !== null && (
+                    {generatedResult !== null && (
                       <div>
                         <h4 className="text-sm font-medium mb-2">Result JSON</h4>
                         <pre className="text-xs text-muted-foreground overflow-auto max-h-96 whitespace-pre-wrap break-all rounded-md bg-muted p-3">
