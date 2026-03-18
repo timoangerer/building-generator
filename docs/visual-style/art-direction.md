@@ -147,6 +147,9 @@ Reference images are for human consumption — they help communicate intent that
 | [Cannon Clash (CrazyGames)](https://www.crazygames.com/game/cannon-clash-yoo) | — | — |
 | [Poki Action Games](https://poki.com/en/action) | — | — |
 | [Jelly Slider in TypeGPU (Reddit)](https://www.reddit.com/r/webgpu/comments/1otbsu5/jelly_slider_in_typegpu/) | — | — |
+| [watabou on itch.io](https://watabou.itch.io/) | Full portfolio of procedural generation tools — cities, towns, dungeons, maps (2D and 3D) | Excellent inspiration source across multiple scales of urban/settlement generation. Explore everything from this author. |
+| [Medieval Fantasy City Generator (watabou)](https://watabou.itch.io/medieval-fantasy-city-generator) | Procedural medieval city generation — street layouts, districts, walls, gates | Strong reference for how organic city layouts emerge from simple rules. Directly relevant to plot/street-level generation. |
+| [TownGeneratorOS — source code (GitHub)](https://github.com/watabou/TownGeneratorOS) | Open-source Haxe implementation of the town generator | Study the generation algorithms: how plots are subdivided, how districts form, how street networks are grown procedurally. |
 
 ## Technique Notes
 
