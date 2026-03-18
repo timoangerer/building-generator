@@ -83,6 +83,10 @@ export function WorkbenchShell() {
     ? selectedFixture.seeds[selection.itemIndex]
     : null;
 
+  const selectedPresetName = isToolSelection
+    ? (selectedSection as ToolSection).items[selection.itemIndex].id
+    : presets[0].name;
+
   const { wireframe, showWall, showLabels } = useControls("Display", {
     wireframe: false,
     showWall: false,
@@ -131,13 +135,15 @@ const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, see
     if (toolRendererRef.current) {
       toolRendererRef.current.dispose();
       toolRendererRef.current = null;
+      mountedToolRef.current = null;
       setEnvApi(null);
     }
   }, []);
 
-  // Track which stage is currently mounted so we can reuse the renderer
-  // when only the seed changes (avoids destroying/recreating WebGL contexts).
+  // Track which stage/tool is currently mounted so we can reuse the renderer
+  // when only the seed or preset changes (avoids destroying/recreating WebGL contexts).
   const mountedStageRef = useRef<string | null>(null);
+  const mountedToolRef = useRef<string | null>(null);
 
   // Mount fixture renderer (or update if same stage)
   useEffect(() => {
@@ -170,15 +176,21 @@ const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, see
     }
   }, [selection, selectedFixture, selectedSeed, runFixture, isFixtureSelection, disposeCurrentRenderer]);
 
-  // Mount tool renderer
+  // Mount tool renderer (reuse if same tool, only preset changed)
   useEffect(() => {
     if (!isToolSelection || !viewportRef.current || !selectedSection) return;
     const toolSection = selectedSection as ToolSection;
+
+    // If the same tool is already mounted, skip remount — preset change
+    // flows through the presetName prop to EnvLabControls
+    if (mountedToolRef.current === toolSection.id) return;
 
     disposeCurrentRenderer();
     mountedStageRef.current = null;
     setInvariantResults([]);
     setGeneratedResult(null);
+
+    mountedToolRef.current = toolSection.id;
 
     const toolRenderer = getToolRenderer(toolSection.id);
     if (toolRenderer) {
@@ -195,7 +207,7 @@ const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, see
 
     return () => {
       disposeCurrentRenderer();
-      mountedStageRef.current = null;
+      mountedToolRef.current = null;
     };
   }, [selection, isToolSelection, selectedSection, disposeCurrentRenderer]);
 
@@ -343,8 +355,9 @@ const passedCount = invariantResults.filter((r) => r.passed).length;
 
           {/* Viewport */}
           <div className="flex-1 relative min-h-0">
-            <div className="absolute top-2 right-2 z-10 w-[300px]">
+            <div className="absolute top-2 right-2 z-10 w-[300px] max-h-[calc(100%-1rem)] overflow-y-auto flex flex-col gap-1">
               <Leva fill collapsed={false} titleBar={{ title: "Controls" }} />
+              {isToolSelection && <EnvLabControls key={selectedPresetName} api={envApi} presetName={selectedPresetName} />}
             </div>
             <div ref={viewportRef} className="absolute inset-0 z-0" data-testid="workbench-viewport" />
             {!selection && (
@@ -352,7 +365,6 @@ const passedCount = invariantResults.filter((r) => r.passed).length;
                 Select an item from the sidebar
               </div>
             )}
-            {isToolSelection && <EnvLabControls api={envApi} />}
           </div>
         </SidebarInset>
       </SidebarProvider>
