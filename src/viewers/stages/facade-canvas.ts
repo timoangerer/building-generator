@@ -147,48 +147,84 @@ function drawWireframe(
   ctx.restore();
 
   // Element bounding rectangles with labels
-  for (const placement of view.placements) {
-    const bounds = view.elementBounds.get(placement.elementId);
-    if (!bounds) continue;
+  if (view.layout) {
+    // Use layout elements directly (already in wall-local coords)
+    for (const el of view.layout.elements) {
+      const cx = el.x;
+      const cy = el.y;
+      const w = el.width;
+      const h = el.height;
 
-    const sx = placement.scale?.x ?? 1;
-    const sy = placement.scale?.y ?? 1;
-    const w = bounds.width * sx;
-    const h = bounds.height * sy;
+      ctx.strokeStyle = colors.element;
+      ctx.lineWidth = 1.5 / scale;
+      ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
 
-    // Convert world position to wall-local coordinates
-    const localX = worldToWallLocal(view, placement.position.x, placement.position.z);
-    const localY = placement.position.y;
+      // Label
+      ctx.save();
+      ctx.scale(1, -1);
+      const labelSize = Math.max(0.1, 8 / scale);
+      ctx.font = `bold ${labelSize}px monospace`;
+      ctx.fillStyle = colors.element;
+      ctx.textAlign = "center";
+      ctx.fillText(
+        el.elementId,
+        cx,
+        -(cy + h / 2 + labelSize * 0.3),
+      );
+      // Dimension annotation
+      ctx.font = `${labelSize}px monospace`;
+      ctx.fillStyle = colors.dimension;
+      ctx.fillText(
+        `${w.toFixed(2)}×${h.toFixed(2)}`,
+        cx,
+        -(cy - h / 2 - labelSize * 1.2),
+      );
+      ctx.restore();
+    }
+  } else {
+    for (const placement of view.placements) {
+      const bounds = view.elementBounds.get(placement.elementId);
+      if (!bounds) continue;
 
-    // The bounding box center is offset from the element origin
-    const cx = localX + bounds.offsetX * sx;
-    const cy = localY + bounds.offsetY * sy;
+      const sx = placement.scale?.x ?? 1;
+      const sy = placement.scale?.y ?? 1;
+      const w = bounds.width * sx;
+      const h = bounds.height * sy;
 
-    ctx.strokeStyle = colors.element;
-    ctx.lineWidth = 1.5 / scale;
-    ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+      // Convert world position to wall-local coordinates
+      const localX = worldToWallLocal(view, placement.position.x, placement.position.z);
+      const localY = placement.position.y;
 
-    // Label
-    ctx.save();
-    ctx.scale(1, -1);
-    const labelSize = Math.max(0.1, 8 / scale);
-    ctx.font = `bold ${labelSize}px monospace`;
-    ctx.fillStyle = colors.element;
-    ctx.textAlign = "center";
-    ctx.fillText(
-      placement.elementId,
-      cx,
-      -(cy + h / 2 + labelSize * 0.3),
-    );
-    // Dimension annotation
-    ctx.font = `${labelSize}px monospace`;
-    ctx.fillStyle = colors.dimension;
-    ctx.fillText(
-      `${w.toFixed(2)}×${h.toFixed(2)}`,
-      cx,
-      -(cy - h / 2 - labelSize * 1.2),
-    );
-    ctx.restore();
+      // The bounding box center is offset from the element origin
+      const cx = localX + bounds.offsetX * sx;
+      const cy = localY + bounds.offsetY * sy;
+
+      ctx.strokeStyle = colors.element;
+      ctx.lineWidth = 1.5 / scale;
+      ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+
+      // Label
+      ctx.save();
+      ctx.scale(1, -1);
+      const labelSize = Math.max(0.1, 8 / scale);
+      ctx.font = `bold ${labelSize}px monospace`;
+      ctx.fillStyle = colors.element;
+      ctx.textAlign = "center";
+      ctx.fillText(
+        placement.elementId,
+        cx,
+        -(cy + h / 2 + labelSize * 0.3),
+      );
+      // Dimension annotation
+      ctx.font = `${labelSize}px monospace`;
+      ctx.fillStyle = colors.dimension;
+      ctx.fillText(
+        `${w.toFixed(2)}×${h.toFixed(2)}`,
+        cx,
+        -(cy - h / 2 - labelSize * 1.2),
+      );
+      ctx.restore();
+    }
   }
 }
 
@@ -226,44 +262,87 @@ function drawRendered(
   }
 
   // Draw element composite parts
-  for (const placement of view.placements) {
-    const elDef = view.elementCatalog.get(placement.elementId);
-    if (!elDef || elDef.geometry.type !== "composite") continue;
+  if (view.layout) {
+    for (const layoutEl of view.layout.elements) {
+      const elDef = view.elementCatalog.get(layoutEl.elementId);
+      if (!elDef || elDef.geometry.type !== "composite") continue;
 
-    const sx = placement.scale?.x ?? 1;
-    const sy = placement.scale?.y ?? 1;
+      const bounds = view.elementBounds.get(layoutEl.elementId);
+      if (!bounds) continue;
 
-    const localX = worldToWallLocal(view, placement.position.x, placement.position.z);
-    const localY = placement.position.y;
+      const s = layoutEl.scale;
+      // The layout element's x,y is the bbox center.
+      // The geometry origin is at (x - offsetX*s, y - offsetY*s)
+      const originX = layoutEl.x - bounds.offsetX * s;
+      const originY = layoutEl.y - bounds.offsetY * s;
 
-    for (const part of elDef.geometry.parts) {
-      if (part.shape === "cylinder" || part.shape === "half_cylinder") {
-        // Draw as rectangle approximation
-        let pw: number, ph: number;
-        if (part.shape === "cylinder") {
-          pw = part.dimensions.radius * 2;
-          ph = part.dimensions.height;
+      for (const part of elDef.geometry.parts) {
+        if (part.shape === "cylinder" || part.shape === "half_cylinder") {
+          let pw: number, ph: number;
+          if (part.shape === "cylinder") {
+            pw = part.dimensions.radius * 2;
+            ph = part.dimensions.height;
+          } else {
+            pw = part.dimensions.radius * 2;
+            ph = part.dimensions.radius;
+          }
+          const px = originX + part.position.x * s;
+          const py = originY + part.position.y * s;
+          ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
+          ctx.fillRect(
+            px - (pw * s) / 2,
+            py - (part.shape === "half_cylinder" ? 0 : (ph * s) / 2),
+            pw * s,
+            ph * s,
+          );
         } else {
-          pw = part.dimensions.radius * 2;
-          ph = part.dimensions.radius;
+          const pw = part.dimensions.width * s;
+          const ph = part.dimensions.height * s;
+          const px = originX + part.position.x * s;
+          const py = originY + part.position.y * s;
+          ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
+          ctx.fillRect(px - pw / 2, py - ph / 2, pw, ph);
         }
-        const px = localX + part.position.x * sx;
-        const py = localY + part.position.y * sy;
-        ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
-        ctx.fillRect(
-          px - (pw * sx) / 2,
-          py - (part.shape === "half_cylinder" ? 0 : (ph * sy) / 2),
-          pw * sx,
-          ph * sy,
-        );
-      } else {
-        // Box
-        const pw = part.dimensions.width * sx;
-        const ph = part.dimensions.height * sy;
-        const px = localX + part.position.x * sx;
-        const py = localY + part.position.y * sy;
-        ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
-        ctx.fillRect(px - pw / 2, py - ph / 2, pw, ph);
+      }
+    }
+  } else {
+    for (const placement of view.placements) {
+      const elDef = view.elementCatalog.get(placement.elementId);
+      if (!elDef || elDef.geometry.type !== "composite") continue;
+
+      const sx = placement.scale?.x ?? 1;
+      const sy = placement.scale?.y ?? 1;
+
+      const localX = worldToWallLocal(view, placement.position.x, placement.position.z);
+      const localY = placement.position.y;
+
+      for (const part of elDef.geometry.parts) {
+        if (part.shape === "cylinder" || part.shape === "half_cylinder") {
+          let pw: number, ph: number;
+          if (part.shape === "cylinder") {
+            pw = part.dimensions.radius * 2;
+            ph = part.dimensions.height;
+          } else {
+            pw = part.dimensions.radius * 2;
+            ph = part.dimensions.radius;
+          }
+          const px = localX + part.position.x * sx;
+          const py = localY + part.position.y * sy;
+          ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
+          ctx.fillRect(
+            px - (pw * sx) / 2,
+            py - (part.shape === "half_cylinder" ? 0 : (ph * sy) / 2),
+            pw * sx,
+            ph * sy,
+          );
+        } else {
+          const pw = part.dimensions.width * sx;
+          const ph = part.dimensions.height * sy;
+          const px = localX + part.position.x * sx;
+          const py = localY + part.position.y * sy;
+          ctx.fillStyle = hexToCSS(palette[part.role] ?? 0x808080);
+          ctx.fillRect(px - pw / 2, py - ph / 2, pw, ph);
+        }
       }
     }
   }

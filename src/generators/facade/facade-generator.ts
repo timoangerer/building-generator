@@ -5,12 +5,19 @@ import type {
   ElementPlacement,
   ElementDefinition,
   BayGridEntry,
+  PlacementWarning,
   Vec3,
+  FacadeLayout,
+  FacadeLayoutElement,
 } from "@/contracts";
 import { createRng } from "@/utils";
-import { computeElementBounds, type ElementBounds } from "@/core-geometry";
-
-const SILL_HEIGHT = 0.9;
+import {
+  computeElementBounds,
+  type ElementBounds,
+  resolveTilePlacement,
+  getDefaultPlacementRule,
+  verifyPlacement,
+} from "@/core-geometry";
 
 function categorizeElements(elements: ElementDefinition[]) {
   const windows: ElementDefinition[] = [];
@@ -116,6 +123,8 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
 
     const placements: ElementPlacement[] = [];
     const bayGrid: BayGridEntry[] = [];
+    const warnings: PlacementWarning[] = [];
+    const layoutElements: FacadeLayoutElement[] = [];
 
     // Compute bays
     const usableWidth = wall.length - 2 * config.edgeMargin;
@@ -127,14 +136,8 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
       };
     }
 
-    const bayCount = Math.floor(usableWidth / config.bayWidth);
-    if (bayCount === 0) {
-      return {
-        buildingId: wall.buildingId,
-        wallIndex: wall.wallIndex,
-        placements: [],
-      };
-    }
+    const bayCount = Math.max(1, Math.round(usableWidth / config.bayWidth));
+    const actualBayWidth = usableWidth / bayCount;
 
     // Wall direction
     const dx = wall.end.x - wall.start.x;
@@ -154,6 +157,13 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
       entryDoors.length > 0 ? pickRng(entryDoors, buildingRng) : null;
 
     const floorCount = config.floors.length;
+
+    // Compute total height for layout
+    const totalHeight =
+      config.floors.length > 0
+        ? config.floors[config.floors.length - 1].baseY +
+          config.floors[config.floors.length - 1].height
+        : 0;
 
     for (const floor of config.floors) {
       const isGround = floor.floorIndex === 0;
@@ -194,31 +204,67 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
           element = buildingWindows?.primary ?? null;
         }
 
-        if (!element) continue;
+        // Empty bay detection
+        if (!element) {
+          warnings.push({
+            floorIndex: floor.floorIndex,
+            bayIndex: bay,
+            elementId: "",
+            type: "empty-bay",
+          });
+          continue;
+        }
 
-        const bounds = boundsMap.get(element.elementId);
-        if (!bounds) continue;
+        const rawBounds = boundsMap.get(element.elementId);
+        if (!rawBounds) continue;
 
-        // Bay center offset along wall
-        const u = config.edgeMargin + (bay + 0.5) * config.bayWidth;
+        // Bay center offset along wall (wall-local)
+        const u = config.edgeMargin + (bay + 0.5) * actualBayWidth;
+
+        // Tile dimensions for this bay×floor cell
+        const tile = { width: actualBayWidth, height: floor.height };
+
+        // Compute scale FIRST so placement uses scaled bounds
+        const scaleFactor = computeScale(rawBounds, actualBayWidth, floor.height);
+        const s = scaleFactor ?? 1;
+        const bounds = {
+          ...rawBounds,
+          width: rawBounds.width * s,
+          height: rawBounds.height * s,
+          depth: rawBounds.depth * s,
+          offsetX: rawBounds.offsetX * s,
+          offsetY: rawBounds.offsetY * s,
+          offsetZ: rawBounds.offsetZ * s,
+        };
+
+        // Resolve placement using the anchor/origin model with scaled bounds
+        const rule = getDefaultPlacementRule(element.type);
+        const { localX, localY } = resolveTilePlacement(tile, bounds, rule);
+
+        // Build FacadeLayoutElement (wall-local 2D coordinates)
+        const layoutX = config.edgeMargin + (bay + 0.5) * actualBayWidth + bounds.offsetX;
+        const layoutY = floor.baseY + localY + bounds.offsetY;
+
+        layoutElements.push({
+          elementId: element.elementId,
+          elementType: element.type,
+          floorIndex: floor.floorIndex,
+          bayIndex: bay,
+          x: layoutX,
+          y: layoutY,
+          width: bounds.width,
+          height: bounds.height,
+          scale: s,
+        });
+
+        // Transform to world space for backward compatibility
         const uNorm = u / wall.length;
-
-        // Y-position: doors bottom at floor base, windows sill at ~0.9m
-        const isDoor = element.type === "door";
-        const y = isDoor
-          ? floor.baseY + bounds.height / 2
-          : floor.baseY + SILL_HEIGHT + bounds.height / 2;
-
-        // World position
         const normalOffset = 0.02;
         const position: Vec3 = {
           x: wall.start.x + uNorm * dx + wall.normal.x * normalOffset,
-          y,
+          y: floor.baseY + localY,
           z: wall.start.z + uNorm * dz + wall.normal.z * normalOffset,
         };
-
-        // Optional proportional scaling
-        const scaleFactor = computeScale(bounds, config.bayWidth, floor.height);
 
         const placement: ElementPlacement = {
           elementId: element.elementId,
@@ -237,14 +283,44 @@ export function generateFacade(config: FacadeConfig): FacadeResult {
           bayIndex: bay,
           elementId: element.elementId,
         });
+
+        // Run containment verification with scaled bounds
+        const placementWarnings = verifyPlacement(
+          tile,
+          bounds,
+          { localX, localY },
+          {
+            floorIndex: floor.floorIndex,
+            bayIndex: bay,
+            elementId: element.elementId,
+          },
+        );
+        warnings.push(...placementWarnings);
       }
     }
+
+    const layout: FacadeLayout = {
+      wallLength: wall.length,
+      totalHeight,
+      bayWidth: actualBayWidth,
+      edgeMargin: config.edgeMargin,
+      bayCount,
+      floors: config.floors.map((f) => ({
+        floorIndex: f.floorIndex,
+        baseY: f.baseY,
+        height: f.height,
+      })),
+      elements: layoutElements,
+      warnings,
+    };
 
     return {
       buildingId: wall.buildingId,
       wallIndex: wall.wallIndex,
       placements,
       bayGrid,
+      warnings,
+      layout,
     };
   });
 

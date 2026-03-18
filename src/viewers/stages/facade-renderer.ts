@@ -23,13 +23,21 @@ function facadeResultToView(result: FacadeResult): FacadeLabView | null {
     );
     if (!wall || wall.neighborBuildingId) continue;
 
-    const usableWidth = Math.max(0, wall.length - 2 * result.config.edgeMargin);
-    const bayCount = Math.max(0, Math.floor(usableWidth / result.config.bayWidth));
+    const layout = facade.layout;
+    const usableWidth = layout
+      ? layout.bayWidth * layout.bayCount
+      : Math.max(0, wall.length - 2 * result.config.edgeMargin);
+    const bayCount = layout
+      ? layout.bayCount
+      : Math.max(0, Math.round(usableWidth / result.config.bayWidth));
+    const bayWidth = layout
+      ? layout.bayWidth
+      : result.config.bayWidth;
 
     return {
       wall,
       floors: result.config.floors,
-      bayWidth: result.config.bayWidth,
+      bayWidth,
       edgeMargin: result.config.edgeMargin,
       placements: facade.placements,
       elementCatalog,
@@ -37,6 +45,7 @@ function facadeResultToView(result: FacadeResult): FacadeLabView | null {
       palette: defaultPalette,
       bayCount,
       usableWidth,
+      layout,
     };
   }
 
