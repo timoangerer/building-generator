@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useControls } from "leva";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useControls, useCreateStore, LevaPanel } from "leva";
 import {
   type EnvSceneApi,
   presets,
@@ -11,7 +11,14 @@ import {
 
 const categories: LayerCategory[] = ["terrain", "sky", "water"];
 
-export function EnvLabControls({ api }: { api: EnvSceneApi | null }) {
+function findPreset(name: string) {
+  return presets.find((p) => p.name === name) ?? presets[0];
+}
+
+export function EnvLabControls({ api, presetName }: { api: EnvSceneApi | null; presetName: string }) {
+  const preset = findPreset(presetName);
+  const store = useCreateStore();
+
   const [layerParams, setLayerParams] = useState<Record<LayerCategory, ParamDescriptor[]>>({
     water: [],
     sky: [],
@@ -24,87 +31,96 @@ export function EnvLabControls({ api }: { api: EnvSceneApi | null }) {
     terrain: getLayerIds("terrain"),
   };
 
-  const presetOptions = Object.fromEntries(presets.map((p) => [p.name, p.name]));
-
-  const [{ preset }, setPresetControls] = useControls("Preset", () => ({
-    preset: { options: presetOptions, value: presets[0].name },
-  }), []);
-
   const terrainOptions = Object.fromEntries(layerOptionSets.terrain.map((id) => [id, id]));
   const skyOptions = Object.fromEntries(layerOptionSets.sky.map((id) => [id, id]));
   const waterOptions = Object.fromEntries(layerOptionSets.water.map((id) => [id, id]));
 
-  const [terrainControls, setTerrainControls] = useControls("Terrain", () => {
+  // Helper: get default value for a param, applying preset overrides
+  const getDefault = (cat: LayerCategory, pd: ParamDescriptor) => {
+    if (preset.overrides) {
+      for (const [layerId, overrideParams] of Object.entries(preset.overrides)) {
+        if (preset[cat] === layerId && pd.key in overrideParams) {
+          return overrideParams[pd.key];
+        }
+      }
+    }
+    return pd.default;
+  };
+
+  const [terrainControls] = useControls("Terrain", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const schema: Record<string, any> = {
-      layer: { options: terrainOptions, value: presets[0].terrain },
+      layer: { options: terrainOptions, value: preset.terrain },
     };
     for (const p of layerParams.terrain) {
+      const val = getDefault("terrain", p);
       if (p.type === "color") {
-        schema[p.key] = { value: p.default as string, label: p.label };
+        schema[p.key] = { value: val as string, label: p.label };
       } else {
-        schema[p.key] = { value: p.default, min: p.min, max: p.max, step: p.step, label: p.label };
+        schema[p.key] = { value: val, min: p.min, max: p.max, step: p.step, label: p.label };
       }
     }
     return schema;
-  }, [layerParams.terrain]);
+  }, { store }, [layerParams.terrain]);
 
-  const [skyControls, setSkyControls] = useControls("Sky", () => {
+  const [skyControls] = useControls("Sky", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const schema: Record<string, any> = {
-      layer: { options: skyOptions, value: presets[0].sky },
+      layer: { options: skyOptions, value: preset.sky },
     };
     for (const p of layerParams.sky) {
+      const val = getDefault("sky", p);
       if (p.type === "color") {
-        schema[p.key] = { value: p.default as string, label: p.label };
+        schema[p.key] = { value: val as string, label: p.label };
       } else {
-        schema[p.key] = { value: p.default, min: p.min, max: p.max, step: p.step, label: p.label };
+        schema[p.key] = { value: val, min: p.min, max: p.max, step: p.step, label: p.label };
       }
     }
     return schema;
-  }, [layerParams.sky]);
+  }, { store }, [layerParams.sky]);
 
-  const [waterControls, setWaterControls] = useControls("Water", () => {
+  const [waterControls] = useControls("Water", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const schema: Record<string, any> = {
-      layer: { options: waterOptions, value: presets[0].water },
+      layer: { options: waterOptions, value: preset.water },
     };
     for (const p of layerParams.water) {
+      const val = getDefault("water", p);
       if (p.type === "color") {
-        schema[p.key] = { value: p.default as string, label: p.label };
+        schema[p.key] = { value: val as string, label: p.label };
       } else {
-        schema[p.key] = { value: p.default, min: p.min, max: p.max, step: p.step, label: p.label };
+        schema[p.key] = { value: val, min: p.min, max: p.max, step: p.step, label: p.label };
       }
     }
     return schema;
-  }, [layerParams.water]);
+  }, { store }, [layerParams.water]);
 
-  const [fogControls, setFogControls] = useControls("Fog", () => ({
-    enabled: { value: presets[0].fog.enabled },
+  const [fogControls] = useControls("Fog", () => ({
+    enabled: { value: preset.fog.enabled },
     type: {
       options: { Linear: "linear" as const, Exponential: "exponential" as const },
-      value: presets[0].fog.type,
+      value: preset.fog.type,
     },
-    color: { value: presets[0].fog.color },
+    color: { value: preset.fog.color },
     near: {
-      value: presets[0].fog.near ?? 50,
+      value: preset.fog.near ?? 50,
       min: 0, max: 200, step: 1,
       render: (get: (path: string) => unknown) =>
         get("Fog.enabled") === true && get("Fog.type") === "linear",
     },
     far: {
-      value: presets[0].fog.far ?? 200,
+      value: preset.fog.far ?? 200,
       min: 50, max: 500, step: 1,
       render: (get: (path: string) => unknown) =>
         get("Fog.enabled") === true && get("Fog.type") === "linear",
     },
     density: {
-      value: presets[0].fog.density ?? 0.01,
+      value: preset.fog.density ?? 0.01,
       min: 0.0001, max: 0.05, step: 0.0001,
       render: (get: (path: string) => unknown) =>
         get("Fog.enabled") === true && get("Fog.type") === "exponential",
     },
-  }), []);
+  }), { store }, []);
 
   const readLayerParams = useCallback((sceneApi: EnvSceneApi) => {
     const params: Record<LayerCategory, ParamDescriptor[]> = { water: [], sky: [], terrain: [] };
@@ -115,33 +131,23 @@ export function EnvLabControls({ api }: { api: EnvSceneApi | null }) {
       }
     }
     setLayerParams(params);
-    return params;
   }, []);
 
-  // Read initial params when api becomes available
+  // Apply preset to the scene on mount (when api becomes available)
+  const appliedRef = useRef(false);
   useEffect(() => {
-    if (!api) return;
-    readLayerParams(api);
-  }, [api, readLayerParams]);
-
-  // Preset change
-  const prevPresetRef = useRef(presets[0].name);
-  useEffect(() => {
-    if (preset === prevPresetRef.current) return;
-    prevPresetRef.current = preset;
-
-    const p = presets.find((pr) => pr.name === preset);
-    if (!p || !api) return;
+    if (!api || appliedRef.current) return;
+    appliedRef.current = true;
 
     for (const cat of categories) {
-      api.setLayer(cat, p[cat]);
+      api.setLayer(cat, preset[cat]);
     }
-    api.setFog(p.fog);
+    api.setFog(preset.fog);
 
-    if (p.overrides) {
-      for (const [layerId, params] of Object.entries(p.overrides)) {
+    if (preset.overrides) {
+      for (const [layerId, params] of Object.entries(preset.overrides)) {
         for (const cat of categories) {
-          if (p[cat] === layerId) {
+          if (preset[cat] === layerId) {
             for (const [key, value] of Object.entries(params)) {
               api.setLayerParam(cat, key, value);
             }
@@ -150,40 +156,11 @@ export function EnvLabControls({ api }: { api: EnvSceneApi | null }) {
       }
     }
 
-    const newParams = readLayerParams(api);
+    readLayerParams(api);
+  }, [api, preset, readLayerParams]);
 
-    const buildValues = (cat: LayerCategory): Record<string, unknown> => {
-      const vals: Record<string, unknown> = { layer: p[cat] };
-      for (const pd of newParams[cat]) {
-        vals[pd.key] = pd.default;
-      }
-      if (p.overrides) {
-        for (const [layerId, overrideParams] of Object.entries(p.overrides)) {
-          if (p[cat] === layerId) {
-            for (const [key, value] of Object.entries(overrideParams)) {
-              vals[key] = value;
-            }
-          }
-        }
-      }
-      return vals;
-    };
-
-    setTerrainControls(buildValues("terrain"));
-    setSkyControls(buildValues("sky"));
-    setWaterControls(buildValues("water"));
-    setFogControls({
-      enabled: p.fog.enabled,
-      type: p.fog.type,
-      color: p.fog.color,
-      near: p.fog.near ?? 50,
-      far: p.fog.far ?? 200,
-      density: p.fog.density ?? 0.01,
-    });
-  }, [preset, api, readLayerParams, setTerrainControls, setSkyControls, setWaterControls, setFogControls]);
-
-  // Sync layer selection changes
-  const prevLayersRef = useRef({ terrain: presets[0].terrain, sky: presets[0].sky, water: presets[0].water });
+  // Sync layer selection changes (user tweaks in Leva)
+  const prevLayersRef = useRef({ terrain: preset.terrain, sky: preset.sky, water: preset.water });
   useEffect(() => {
     if (!api) return;
     const current = {
@@ -247,5 +224,10 @@ export function EnvLabControls({ api }: { api: EnvSceneApi | null }) {
     api.setFog(fog);
   }, [fogControls, api]);
 
-  return null;
+  return React.createElement(LevaPanel, {
+    store,
+    fill: true,
+    collapsed: false,
+    titleBar: { title: "Environment" },
+  });
 }
