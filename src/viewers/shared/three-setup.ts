@@ -90,16 +90,28 @@ export function createThreeContext(
 }
 
 export function clearMeshes(ctx: ThreeContext) {
-  for (const m of ctx.meshes) ctx.scene.remove(m);
+  for (const m of ctx.meshes) {
+    ctx.scene.remove(m);
+    m.traverse((child) => {
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+        child.geometry.dispose();
+        const mat = child.material;
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+        else mat.dispose();
+      }
+    });
+  }
   ctx.meshes = [];
 }
 
 export function disposeContext(ctx: ThreeContext) {
   cancelAnimationFrame(ctx.animId);
   window.removeEventListener("resize", ctx.onResize);
+  clearMeshes(ctx);
+  ctx.controls.dispose();
   ctx.renderer.dispose();
+  ctx.renderer.forceContextLoss();
   if (ctx.renderer.domElement.parentNode === ctx.container) {
     ctx.container.removeChild(ctx.renderer.domElement);
   }
-  ctx.controls.dispose();
 }

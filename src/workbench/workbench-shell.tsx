@@ -154,24 +154,39 @@ export function WorkbenchShell() {
     }
   }, []);
 
-  // Mount fixture renderer
+  // Track which stage is currently mounted so we can reuse the renderer
+  // when only the seed changes (avoids destroying/recreating WebGL contexts).
+  const mountedStageRef = useRef<string | null>(null);
+
+  // Mount fixture renderer (or update if same stage)
   useEffect(() => {
-    if (!isFixtureSelection || !viewportRef.current || !selectedFixture || selectedSeed === null) return;
+    if (!isFixtureSelection || !viewportRef.current || !selectedFixture || selectedSeed === null) {
+      // Selection cleared or switched away from fixture — dispose
+      if (rendererRef.current) {
+        disposeCurrentRenderer();
+        mountedStageRef.current = null;
+      }
+      return;
+    }
 
     const result = runFixture(selectedFixture, selectedSeed);
     resultRef.current = result;
 
+    // Same stage: reuse existing renderer, just swap scene content
+    if (rendererRef.current && mountedStageRef.current === selectedFixture.stage) {
+      rendererRef.current.update(result, renderOptions);
+      return;
+    }
+
+    // Different stage (or first mount): full dispose + mount
     disposeCurrentRenderer();
+    mountedStageRef.current = selectedFixture.stage;
 
     const renderer = getRenderer(selectedFixture.stage);
     if (renderer) {
       renderer.mount(viewportRef.current, result, renderOptions);
       rendererRef.current = renderer;
     }
-
-    return () => {
-      disposeCurrentRenderer();
-    };
   }, [selection, selectedFixture, selectedSeed, runFixture, isFixtureSelection, disposeCurrentRenderer]);
 
   // Mount tool renderer
@@ -180,6 +195,7 @@ export function WorkbenchShell() {
     const toolSection = selectedSection as ToolSection;
 
     disposeCurrentRenderer();
+    mountedStageRef.current = null;
     setInvariantResults([]);
     setGeneratedResult(null);
 
@@ -198,8 +214,14 @@ export function WorkbenchShell() {
 
     return () => {
       disposeCurrentRenderer();
+      mountedStageRef.current = null;
     };
   }, [selection, isToolSelection, selectedSection, disposeCurrentRenderer]);
+
+  // Dispose on unmount
+  useEffect(() => {
+    return () => { disposeCurrentRenderer(); };
+  }, [disposeCurrentRenderer]);
 
   // Update fixture renderer on option changes
   useEffect(() => {
