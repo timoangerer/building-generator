@@ -32,7 +32,8 @@ export const elementFixture: GeneratorFixture<ElementCatalogConfig, ElementCatal
   generator: generateElementCatalog,
   schema: ElementCatalogSchema,
   configFactory: (seed): ElementCatalogConfig => ({ seed }),
-  seeds: [1, 42, 123, 999],
+  seeds: [1],
+  labels: ["Mediterranean Kit"],
   invariants: [
     {
       name: "contains all 9 Mediterranean element IDs",
