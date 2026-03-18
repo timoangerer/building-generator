@@ -1,7 +1,7 @@
 export type RenderOptions = {
   wireframe: boolean;
-  colorMode: "role" | "element-type" | "building" | "flat";
-  showBounds: boolean;
+  showWall: boolean;
+  showLabels: boolean;
 };
 
 export type StageRenderer<T> = {
