@@ -12,7 +12,7 @@ The facade generator SHALL divide each exposed wall into bays of width `bayWidth
 
 #### Scenario: Element placement at bay centers
 - **WHEN** elements are placed on a wall
-- **THEN** each placement's position SHALL be at the center of its bay horizontally and at the center of its floor vertically
+- **THEN** each placement's horizontal position SHALL be at the center of its bay, and vertical position SHALL be determined by `resolveTilePlacement`
 
 ### Requirement: Party walls have no placements
 Walls with `neighborBuildingId` set SHALL produce a WallFacade with an empty `placements` array.
@@ -65,15 +65,19 @@ The facade generator SHALL produce identical output for identical inputs includi
 - **THEN** both outputs SHALL be deeply equal
 
 ### Requirement: Element placement at bay centers
-Each placement's horizontal position SHALL be at the center of its bay. Vertical position SHALL depend on element type: doors SHALL have their bottom at the floor base (`y = floor.baseY + bounds.height / 2`), and windows SHALL have their sill at approximately 0.9m above floor base (`y = floor.baseY + 0.9 + bounds.height / 2`).
+Each placement's horizontal position SHALL be at the center of its bay. Vertical position SHALL be determined by the tile-placement model: the facade generator SHALL call `resolveTilePlacement` with the tile rect (bayWidth × floorHeight), element bounds (including offsetX/offsetY), and the applicable placement rule (element-type default or grammar override). The resolved local position SHALL then be transformed to world space using the wall's start point, direction, and normal.
 
 #### Scenario: Door Y position near floor base
-- **WHEN** a door element is placed on a floor with baseY = 0
-- **THEN** the placement's `position.y` SHALL approximately equal `bounds.height / 2` (bottom touching floor)
+- **WHEN** a door element is placed on a floor with baseY = 0 using default placement rule (anchor: bottom-center, origin: bottom-center)
+- **THEN** the placement's `position.y` SHALL place the door's visual bottom edge at the floor base (within 0.02m tolerance)
 
 #### Scenario: Window Y position at sill height
-- **WHEN** a window element is placed on a floor with baseY = 0
-- **THEN** the placement's `position.y` SHALL approximately equal `0.9 + bounds.height / 2`
+- **WHEN** a window element is placed on a floor with baseY = 0 using default placement rule (anchor: bottom-center, origin: bottom-center, offset.y: 0.9)
+- **THEN** the placement's `position.y` SHALL place the window's visual bottom edge at 0.9m above floor base (within 0.02m tolerance)
+
+#### Scenario: Balcony door with offset bounds
+- **WHEN** a balcony-door element with non-zero bounds.offsetY is placed using default door placement rule
+- **THEN** the visual bottom of the element's bounding box SHALL align to the floor base, not the geometry origin
 
 ### Requirement: Seeded element selection variety
 The facade generator SHALL select multiple element types per building using seeded RNG rather than always using the first window and first door. Per building, it SHALL pick a "primary window" and "accent window" from the available window elements.
@@ -121,4 +125,11 @@ When an element's bounds do not fill its bay well, the generator MAY set a unifo
 #### Scenario: All placements with scale have positive scale
 - **WHEN** any placement has a `scale` field set
 - **THEN** all components of `scale` SHALL be greater than zero
+
+### Requirement: WallFacade includes placement warnings
+`WallFacade` SHALL include an optional `warnings` field. After computing all placements, the facade generator SHALL run the containment verifier and populate this field.
+
+#### Scenario: Warnings field present on generated facade
+- **WHEN** `generateFacade` produces a WallFacade for an exposed wall
+- **THEN** the WallFacade SHALL have a `warnings` field (which MAY be an empty array)
 
