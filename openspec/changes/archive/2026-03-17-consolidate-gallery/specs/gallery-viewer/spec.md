@@ -3,7 +3,7 @@
 ## Purpose
 Pipeline stage viewer infrastructure providing per-stage renderers, display controls, invariant checking, and fixture navigation — now consolidated under `src/viewers/` and hosted within the unified workbench.
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Viewers module structure
 The system SHALL organize all rendering code under `src/viewers/` with three sub-modules: `shared/` (Three.js setup, geometry utilities, `StageRenderer`/`ToolRenderer`/`RenderOptions` types), `stages/` (per-stage renderers and registry factory), and `environment/` (env scene, layers, presets, controls). A barrel export at `src/viewers/index.ts` SHALL re-export all public APIs.
@@ -36,26 +36,6 @@ The system SHALL provide `getRenderer(stage)` for stage renderers and `getToolRe
 
 ### Requirement: Per-stage renderers
 The system SHALL include renderers for: pipeline (full 3D scene), plot (top-down 2D), massing (3D box volumes), element (single element color-coded by role), facade (2D canvas via facade-canvas), and building (3D colored boxes with floor lines). All renderers SHALL live under `src/viewers/stages/`.
-
-#### Scenario: Scene renderer renders full building scene
-- **WHEN** the scene renderer is mounted with a pipeline result
-- **THEN** it SHALL render a full Three.js scene with OrbitControls
-
-#### Scenario: Facade renderer uses 2D canvas
-- **WHEN** the facade renderer is mounted with a `FacadeResult`
-- **THEN** it SHALL convert the result to a `FacadeLabView` (extracting first non-party wall, computing element bounds, building element catalog) and render it using `renderFacade2D` on a Canvas 2D surface
-
-#### Scenario: Building renderer shows 3D boxes
-- **WHEN** the building renderer is mounted with a `BuildingResult`
-- **THEN** it SHALL render buildings as colored boxes with floor lines, wall outlines, a ground plane, and auto-positioned camera using Three.js with OrbitControls
-
-#### Scenario: Renderers respond to options changes
-- **WHEN** `update` is called with changed `RenderOptions` (wireframe, colorMode, showBounds)
-- **THEN** the renderer SHALL update the visualization accordingly
-
-#### Scenario: Renderer cleanup
-- **WHEN** `dispose` is called on a renderer
-- **THEN** it SHALL release all resources (Three.js objects, canvas elements, ResizeObservers) and remove event listeners
 
 #### Scenario: All stage renderers are registered
 - **WHEN** the renderer factory is initialized
