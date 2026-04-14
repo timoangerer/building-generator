@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Leva, useControls } from "leva";
 import { allFixtures } from "@/test-fixtures";
 import type { GeneratorFixture } from "@/test-fixtures";
+import { allGrammarPresets } from "@/generators/facade";
+import type { FacadeGrammar } from "@/contracts";
 import type {
   RenderOptions,
   InvariantResult,
@@ -93,10 +95,25 @@ export function WorkbenchShell() {
     showLabels: false,
   });
 
+  const grammarOptions = Object.fromEntries(
+    allGrammarPresets.map((g) => [g.name, g.grammarId]),
+  );
+  const { grammar: selectedGrammarId } = useControls("Facade Grammar", {
+    grammar: { value: allGrammarPresets[0].grammarId, options: grammarOptions },
+  }, { collapsed: true });
+
+  const selectedGrammar: FacadeGrammar | undefined = allGrammarPresets.find(
+    (g) => g.grammarId === selectedGrammarId,
+  );
+
   const renderOptions: RenderOptions = { wireframe, showWall, showLabels };
 
-const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, seed: number) => {
+const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, seed: number, grammarOverride?: FacadeGrammar) => {
     const config = fixture.configFactory(seed);
+    // Inject grammar override for facade fixtures
+    if (grammarOverride && fixture.stage === "facade" && typeof config === "object" && config !== null) {
+      (config as Record<string, unknown>).grammar = grammarOverride;
+    }
     const result = fixture.generator(config);
 
     const schemaResult = fixture.schema.safeParse(result);
@@ -156,7 +173,7 @@ const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, see
       return;
     }
 
-    const result = runFixture(selectedFixture, selectedSeed);
+    const result = runFixture(selectedFixture, selectedSeed, selectedGrammar);
     resultRef.current = result;
 
     // Same stage: reuse existing renderer, just swap scene content
@@ -174,7 +191,7 @@ const runFixture = useCallback((fixture: GeneratorFixture<unknown, unknown>, see
       renderer.mount(viewportRef.current, result, renderOptions);
       rendererRef.current = renderer;
     }
-  }, [selection, selectedFixture, selectedSeed, runFixture, isFixtureSelection, disposeCurrentRenderer]);
+  }, [selection, selectedFixture, selectedSeed, selectedGrammar, runFixture, isFixtureSelection, disposeCurrentRenderer]);
 
   // Mount tool renderer (reuse if same tool, only preset changed)
   useEffect(() => {

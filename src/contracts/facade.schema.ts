@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Vec3Schema } from "./base.schema";
 import { WallSegmentSchema, FloorInfoSchema } from "./massing.schema";
 import { ElementDefinitionSchema } from "./element.schema";
+import { FacadeGrammarSchema } from "./facade-grammar.schema";
 
 export const FacadeConfigSchema = z.object({
   seed: z.number(),
@@ -10,6 +11,7 @@ export const FacadeConfigSchema = z.object({
   availableElements: z.array(ElementDefinitionSchema),
   bayWidth: z.number(),
   edgeMargin: z.number(),
+  grammar: FacadeGrammarSchema.optional(),
 });
 
 export const ElementPlacementSchema = z.object({
@@ -66,6 +68,7 @@ export const FacadeLayoutSchema = z.object({
   ),
   elements: z.array(FacadeLayoutElementSchema),
   warnings: z.array(PlacementWarningSchema),
+  grammarId: z.string().optional(),
 });
 
 export const WallFacadeSchema = z.object({

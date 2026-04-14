@@ -14,6 +14,7 @@ const rendererFactories: Record<string, () => StageRenderer<any>> = {
   massing: createMassingRenderer,
   element: createElementRenderer,
   facade: createFacadeRenderer,
+  "facade-neo": createFacadeRenderer,
   building: createBuildingRenderer,
 };
 

@@ -15,6 +15,21 @@ function facadeResultToView(result: FacadeResult): FacadeLabView | null {
     elementCatalog.set(el.elementId, el);
     elementBounds.set(el.elementId, computeElementBounds(el));
   }
+  // Index any placeholder elements from layout that aren't in the catalog
+  for (const facade of result.facades) {
+    if (!facade.layout) continue;
+    for (const layoutEl of facade.layout.elements) {
+      if (!elementCatalog.has(layoutEl.elementId) && layoutEl.elementId.startsWith("placeholder:")) {
+        const placeholderDef: ElementDefinition = {
+          elementId: layoutEl.elementId,
+          type: "wall_panel",
+          geometry: { type: "box", box: { width: layoutEl.width / layoutEl.scale, height: layoutEl.height / layoutEl.scale, depth: 0.05 } },
+        };
+        elementCatalog.set(layoutEl.elementId, placeholderDef);
+        elementBounds.set(layoutEl.elementId, computeElementBounds(placeholderDef));
+      }
+    }
+  }
 
   // Pick the first exposed (non-party) wall
   for (const facade of result.facades) {
