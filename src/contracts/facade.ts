@@ -2,6 +2,7 @@ import type { Vec3 } from "./base";
 import type { WallSegment, FloorInfo } from "./massing";
 import type { ElementDefinition } from "./element";
 import type { ElementType } from "./element";
+import type { FacadeGrammar } from "./facade-grammar";
 
 export type Anchor =
   | "top-left"
@@ -42,6 +43,7 @@ export type FacadeConfig = {
   availableElements: ElementDefinition[];
   bayWidth: number;
   edgeMargin: number;
+  grammar?: FacadeGrammar;
 };
 
 export type ElementPlacement = {
@@ -78,6 +80,7 @@ export type FacadeLayout = {
   floors: { floorIndex: number; baseY: number; height: number }[];
   elements: FacadeLayoutElement[];
   warnings: PlacementWarning[];
+  grammarId?: string;
 };
 
 export type WallFacade = {

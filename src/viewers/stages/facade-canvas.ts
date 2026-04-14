@@ -3,6 +3,41 @@ import type { ColorPalette } from "@/contracts";
 
 export type ViewMode = "wireframe" | "rendered" | "overlay";
 
+function isPlaceholder(elementId: string): boolean {
+  return elementId.startsWith("placeholder:");
+}
+
+function getPlaceholderLabel(elementId: string): string {
+  return elementId.slice("placeholder:".length);
+}
+
+// Distinct colors for common placeholder element types
+const placeholderColors: Record<string, string> = {
+  "rusticated-panel": "#a09080",
+  "rusticated-window": "#8a7a6a",
+  "pilaster": "#c0a888",
+  "cornice": "#b8a090",
+  "oculus": "#7090b0",
+  "pediment": "#d0b898",
+  "balustrade": "#c8b8a0",
+  "keystone": "#b0a090",
+};
+
+const defaultPlaceholderColors = [
+  "#9088c0", "#80a0b8", "#a0b080", "#c0a080",
+  "#b08090", "#80b0a0", "#b0b080", "#a080b0",
+];
+
+function getPlaceholderColor(label: string): string {
+  if (placeholderColors[label]) return placeholderColors[label];
+  // Hash-based fallback
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) | 0;
+  }
+  return defaultPlaceholderColors[Math.abs(hash) % defaultPlaceholderColors.length];
+}
+
 function hexToCSS(hex: number): string {
   return "#" + hex.toString(16).padStart(6, "0");
 }
@@ -155,6 +190,34 @@ function drawWireframe(
       const w = el.width;
       const h = el.height;
 
+      if (isPlaceholder(el.elementId)) {
+        const label = getPlaceholderLabel(el.elementId);
+        const color = getPlaceholderColor(label);
+        // Dashed border for placeholders
+        ctx.save();
+        ctx.setLineDash([0.1, 0.1]);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+        ctx.restore();
+
+        // Filled background with low opacity
+        ctx.fillStyle = color + "40";
+        ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+
+        // Label
+        ctx.save();
+        ctx.scale(1, -1);
+        const labelSize = Math.max(0.1, 9 / scale);
+        ctx.font = `bold ${labelSize}px monospace`;
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, cx, -cy);
+        ctx.restore();
+        continue;
+      }
+
       ctx.strokeStyle = colors.element;
       ctx.lineWidth = 1.5 / scale;
       ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
@@ -261,9 +324,38 @@ function drawRendered(
     ctx.stroke();
   }
 
-  // Draw element composite parts
+  // Draw element composite parts (and placeholder elements)
   if (view.layout) {
     for (const layoutEl of view.layout.elements) {
+      // Placeholder elements: draw as colored labeled rectangles
+      if (isPlaceholder(layoutEl.elementId)) {
+        const label = getPlaceholderLabel(layoutEl.elementId);
+        const color = getPlaceholderColor(label);
+        const w = layoutEl.width;
+        const h = layoutEl.height;
+
+        // Filled rectangle
+        ctx.fillStyle = color;
+        ctx.fillRect(layoutEl.x - w / 2, layoutEl.y - h / 2, w, h);
+
+        // Border
+        ctx.strokeStyle = "#00000044";
+        ctx.lineWidth = 1 / scale;
+        ctx.strokeRect(layoutEl.x - w / 2, layoutEl.y - h / 2, w, h);
+
+        // Label text
+        ctx.save();
+        ctx.scale(1, -1);
+        const labelSize = Math.max(0.1, 9 / scale);
+        ctx.font = `bold ${labelSize}px monospace`;
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, layoutEl.x, -layoutEl.y);
+        ctx.restore();
+        continue;
+      }
+
       const elDef = view.elementCatalog.get(layoutEl.elementId);
       if (!elDef || elDef.geometry.type !== "composite") continue;
 
